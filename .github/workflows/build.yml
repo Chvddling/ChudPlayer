@@ -1,0 +1,137 @@
+name: Build & release
+
+# Runs on every push to main, on demand, and every day.
+# The daily run checks for a new NewPipeExtractor release; if there is one it bumps
+# extractor.version, commits it, and builds + publishes a new ChudPlayer release.
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+    inputs:
+      force_release:
+        description: 'Build and release even if nothing changed'
+        type: boolean
+        default: true
+  schedule:
+    - cron: '17 5 * * *'   # every day at 05:17 UTC
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-release
+  cancel-in-progress: false
+
+jobs:
+  bump-extractor:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.bump.outputs.changed }}
+      version: ${{ steps.bump.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Check for a newer NewPipeExtractor
+        id: bump
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest=$(gh api repos/TeamNewPipe/NewPipeExtractor/releases/latest --jq .tag_name)
+          current=$(tr -d '[:space:]' < extractor.version)
+          echo "current=$current latest=$latest"
+          echo "version=$latest" >> "$GITHUB_OUTPUT"
+          if [ -n "$latest" ] && [ "$latest" != "$current" ]; then
+            echo "$latest" > extractor.version
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -am "Update NewPipeExtractor to $latest"
+            git push origin HEAD:main
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: bump-extractor
+    # Build on pushes and manual runs; on the daily schedule only when the extractor was updated.
+    if: github.event_name != 'schedule' || needs.bump-extractor.outputs.changed == 'true'
+    runs-on: windows-latest
+    env:
+      APP_VERSION: 1.0.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main   # includes the extractor bump made by the job above
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Get libmpv (latest shinchiro build)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $rel = gh api repos/shinchiro/mpv-winbuild-cmake/releases/latest | ConvertFrom-Json
+          $asset = $rel.assets | Where-Object { $_.name -match '^mpv-dev-x86_64-\d{8}-git-[0-9a-f]+\.7z$' } | Select-Object -First 1
+          if (-not $asset) { throw "No mpv-dev-x86_64 asset found in $($rel.tag_name)" }
+          Write-Host "Using $($asset.name)"
+          Invoke-WebRequest $asset.browser_download_url -OutFile mpv-dev.7z
+          7z e mpv-dev.7z -r libmpv-2.dll -onative-resources/windows -y | Out-Null
+          if (-not (Test-Path native-resources/windows/libmpv-2.dll)) { throw "libmpv-2.dll missing after extract" }
+
+      - name: Wait for JitPack to have NewPipeExtractor
+        shell: bash
+        run: |
+          v=$(tr -d '[:space:]' < extractor.version)
+          url="https://jitpack.io/com/github/TeamNewPipe/NewPipeExtractor/$v/NewPipeExtractor-$v.pom"
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 120 "$url" || true)
+            echo "JitPack $v: $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 30
+          done
+          echo "JitPack never returned 200, trying the build anyway"
+
+      - name: Build ChudPlayer
+        shell: bash
+        run: ./gradlew createDistributable -PappVersion=$APP_VERSION --console=plain --stacktrace
+
+      - name: Package zip
+        shell: pwsh
+        run: |
+          $app = "build/compose/binaries/main/app/ChudPlayer"
+          if (-not (Test-Path "$app/ChudPlayer.exe")) { throw "ChudPlayer.exe was not built" }
+          Compress-Archive -Path $app -DestinationPath ChudPlayer-windows-x64.zip -Force
+
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ex=$(tr -d '[:space:]' < extractor.version)
+          notes="ChudPlayer $APP_VERSION
+
+          - NewPipeExtractor: $ex
+          - Commit: ${GITHUB_SHA::7}
+
+          **Install:** download ChudPlayer-windows-x64.zip, unzip it anywhere you can write to (e.g. Documents or D:\\Apps), run ChudPlayer.exe.
+          **Update:** ChudPlayer checks for new versions at startup and updates itself (button in the bottom bar)."
+          gh release create "v$APP_VERSION" ChudPlayer-windows-x64.zip \
+            --title "ChudPlayer $APP_VERSION" \
+            --notes "$notes" \
+            --target "$(git rev-parse HEAD)"
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-reports
+          path: build/reports
+          if-no-files-found: ignore

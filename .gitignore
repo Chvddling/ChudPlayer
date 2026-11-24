@@ -1,0 +1,9 @@
+*.7z
+*.iml
+.gradle/
+.idea/
+.kotlin/
+build-log.txt
+build/
+native-resources/windows/*.dll
+out/

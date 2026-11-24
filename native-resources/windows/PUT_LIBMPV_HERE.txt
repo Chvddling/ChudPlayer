@@ -1,0 +1,8 @@
+Put libmpv-2.dll in this folder.
+
+1. Go to https://github.com/shinchiro/mpv-winbuild-cmake/releases
+2. Download the newest  mpv-dev-x86_64-YYYYMMDD-git-xxxxxxx.7z   (the "dev" archive, NOT the plain mpv one)
+   (if your CPU is very recent you can use the  -x86_64-v3  variant, it's a bit faster)
+3. Open it with 7-Zip and copy  libmpv-2.dll  into this folder.
+
+It gets bundled automatically when you build the installer (packageMsi / packageExe).

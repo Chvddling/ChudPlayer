@@ -1,0 +1,229 @@
+package newpipe.desktop
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import newpipe.desktop.data.HistoryStore
+import newpipe.desktop.data.NewPipeSetup
+import newpipe.desktop.data.PlayMode
+import newpipe.desktop.data.PlaylistStore
+import newpipe.desktop.data.Service
+import newpipe.desktop.data.SettingsStore
+import newpipe.desktop.data.YouTubeRepo
+import newpipe.desktop.player.MpvLib
+import newpipe.desktop.player.PlayerController
+import newpipe.desktop.player.VideoHost
+import newpipe.desktop.ui.Aero
+import newpipe.desktop.ui.AppTheme
+import newpipe.desktop.ui.Gloss
+import newpipe.desktop.ui.HistoryScreen
+import newpipe.desktop.ui.MiniPlayerWindow
+import newpipe.desktop.ui.PlayerScreen
+import newpipe.desktop.ui.PlaylistDialog
+import newpipe.desktop.ui.PlaylistDialogHost
+import newpipe.desktop.ui.PlaylistsScreen
+import newpipe.desktop.ui.Screen
+import newpipe.desktop.ui.SearchScreen
+import newpipe.desktop.ui.SearchState
+import newpipe.desktop.ui.ServiceBar
+import newpipe.desktop.ui.SourceList
+import newpipe.desktop.ui.StatusBar
+import newpipe.desktop.ui.TopBar
+import newpipe.desktop.ui.VideoActions
+import newpipe.desktop.ui.VideoLayer
+import newpipe.desktop.ui.serviceName
+import newpipe.desktop.update.Updater
+import newpipe.desktop.update.YtDlp
+import kotlinx.coroutines.launch
+
+class AppState {
+    var screen by mutableStateOf(Screen.Search)
+    var miniPlayerOpen by mutableStateOf(false)
+    var playlistDialog by mutableStateOf<PlaylistDialog?>(null)
+    var openPlaylistId by mutableStateOf<String?>(null)
+}
+
+fun main() {
+    System.setProperty("jna.encoding", "UTF-8")
+    // Show menus and popups as their own small windows, so they appear on top of the (native) video.
+    System.setProperty("compose.layers.type", "WINDOW")
+    MpvLib.prepareSearchPath()
+    NewPipeSetup.init()
+
+    val settings = SettingsStore()
+    val history = HistoryStore()
+    val playlists = PlaylistStore()
+    val repo = YouTubeRepo()
+
+    application {
+        val app = remember { AppState() }
+        val player = remember { PlayerController(repo, history, settings, VideoHost()) }
+        val search = remember { SearchState(repo, CoroutineScope(SupervisorJob() + Dispatchers.Main)) }
+        val actions = remember {
+            VideoActions(
+                player = player,
+                playlists = playlists,
+                showDialog = { app.playlistDialog = it },
+                openPlayer = { app.screen = Screen.Player },
+            )
+        }
+        val bgScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main) }
+        val updater = remember { Updater(bgScope) }
+        var autoUpdate by remember { mutableStateOf(settings.value.autoUpdate) }
+        LaunchedEffect(Unit) {
+            // Keep the yt-dlp backup fresh, then look for a new ChudPlayer release.
+            if (settings.value.ytDlpBackup) bgScope.launch { YtDlp.ensure() }
+            if (autoUpdate) updater.check(manual = false)
+        }
+        val mainWindow = rememberWindowState(size = DpSize(1280.dp, 820.dp))
+        var placementBeforeFullscreen by remember { mutableStateOf(WindowPlacement.Floating) }
+
+        LaunchedEffect(player.fullscreen) {
+            if (player.fullscreen) {
+                if (mainWindow.placement != WindowPlacement.Fullscreen) placementBeforeFullscreen = mainWindow.placement
+                mainWindow.placement = WindowPlacement.Fullscreen
+                app.screen = Screen.Player
+            } else if (mainWindow.placement == WindowPlacement.Fullscreen) {
+                mainWindow.placement = placementBeforeFullscreen
+            }
+        }
+
+        fun submitSearch() {
+            val q = search.query.trim()
+            if (q.isEmpty()) return
+            if (repo.isVideoUrl(q)) {
+                player.playUrl(q)
+                app.screen = Screen.Player
+            } else {
+                app.screen = Screen.Search
+                search.search(q)
+            }
+        }
+
+        fun openMiniPlayer() {
+            if (player.fullscreen) player.changeFullscreen(false)
+            app.miniPlayerOpen = true
+            mainWindow.isMinimized = true
+        }
+
+        Window(
+            onCloseRequest = {
+                player.shutdown()
+                exitApplication()
+            },
+            state = mainWindow,
+            title = player.current?.let { "${it.title} – ChudPlayer" } ?: "ChudPlayer",
+            onKeyEvent = { handleShortcut(it, player) },
+        ) {
+            AppTheme {
+                Box(Modifier.fillMaxSize().background(Aero.bgDeep)) {
+                    if (player.fullscreen) {
+                        PlayerScreen(player, actions)
+                    } else {
+                        Column(Modifier.fillMaxSize()) {
+                            TopBar(player, search.query, { search.query = it }, ::submitSearch)
+                            val info = when (app.screen) {
+                                Screen.Search -> search.summary()
+                                Screen.Player -> player.current?.let { "Playing from ${serviceName(it.serviceId)}" + (if (player.sourceLabel.isNotEmpty()) " · ${player.sourceLabel}" else "") } ?: ""
+                                Screen.Playlists -> "Right-click a playlist or a song for more options"
+                                Screen.History -> "Right-click a song for more options"
+                            }
+                            ServiceBar(search.service.id, { search.changeService(Service.of(it)) }, info)
+                            Row(Modifier.weight(1f)) {
+                                SourceList(app.screen, app.openPlaylistId, playlists, player, actions) { screen, playlistId ->
+                                    app.screen = screen
+                                    app.openPlaylistId = playlistId
+                                }
+                                Box(Modifier.weight(1f).fillMaxHeight().background(Gloss.content)) {
+                                    when (app.screen) {
+                                        Screen.Search -> SearchScreen(search, actions)
+                                        Screen.Player -> PlayerScreen(player, actions)
+                                        Screen.Playlists -> PlaylistsScreen(playlists, actions, app.openPlaylistId) { app.openPlaylistId = it }
+                                        Screen.History -> HistoryScreen(history, actions)
+                                    }
+                                }
+                            }
+                            StatusBar(
+                                player = player,
+                                onMiniPlayer = ::openMiniPlayer,
+                                updater = updater,
+                                onInstallUpdate = {
+                                    updater.install(exitApp = {
+                                        player.shutdown()
+                                        exitApplication()
+                                    })
+                                },
+                                autoUpdate = autoUpdate,
+                                onToggleAutoUpdate = {
+                                    autoUpdate = !autoUpdate
+                                    settings.update { it.copy(autoUpdate = autoUpdate) }
+                                },
+                                onUpdateYtDlp = { bgScope.launch { YtDlp.ensure(force = true) } },
+                            )
+                        }
+                    }
+                    // Must stay last and always composed: hosts mpv's native video window.
+                    VideoLayer(player.video)
+                }
+
+                PlaylistDialogHost(
+                    dialog = app.playlistDialog,
+                    store = playlists,
+                    onDismiss = { app.playlistDialog = null },
+                    onSwitch = { app.playlistDialog = it },
+                    onDeleted = { id -> if (app.openPlaylistId == id) app.openPlaylistId = null },
+                )
+            }
+        }
+
+        if (app.miniPlayerOpen) {
+            MiniPlayerWindow(
+                player = player,
+                onClose = { app.miniPlayerOpen = false },
+                onRestore = {
+                    app.miniPlayerOpen = false
+                    mainWindow.isMinimized = false
+                    app.screen = Screen.Player
+                },
+            )
+        }
+    }
+}
+
+/** Keys that reach the window (i.e. not typed into the search box and not eaten by the video). */
+private fun handleShortcut(e: KeyEvent, player: PlayerController): Boolean {
+    if (e.type != KeyEventType.KeyDown) return false
+    return when (e.key) {
+        Key.F11 -> { if (player.mode == PlayMode.VIDEO && player.hasVideo) player.changeFullscreen(!player.fullscreen); true }
+        Key.Escape -> if (player.fullscreen) { player.changeFullscreen(false); true } else false
+        Key.Spacebar, Key.MediaPlayPause -> { player.togglePause(); true }
+        Key.MediaNext -> { player.next(); true }
+        Key.MediaPrevious -> { player.previous(); true }
+        Key.DirectionRight -> { player.seekRelative(5); true }
+        Key.DirectionLeft -> { player.seekRelative(-5); true }
+        else -> false
+    }
+}
