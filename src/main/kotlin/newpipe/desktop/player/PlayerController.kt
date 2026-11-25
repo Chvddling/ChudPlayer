@@ -16,6 +16,7 @@ import newpipe.desktop.data.HistoryStore
 import newpipe.desktop.data.NoStreamsException
 import newpipe.desktop.data.PlayMode
 import newpipe.desktop.data.Service
+import newpipe.desktop.data.VideoResult
 import newpipe.desktop.data.SettingsStore
 import newpipe.desktop.data.StreamDetails
 import newpipe.desktop.data.VideoItem
@@ -78,6 +79,7 @@ class PlayerController(
     private var pendingAudio: String? = null
     private var pendingSeek: Double? = null
     private var triedYtDlp = false
+    private var triedYouTube = false
     @Volatile private var lastPosSent = -1.0
 
     // ---------------- queue ----------------
@@ -268,6 +270,7 @@ class PlayerController(
         if (shufflePlayed.size > 500) shufflePlayed.removeAt(0)
         loadJob?.cancel()
         details = null; error = null; loading = true; sourceLabel = ""; backupNotice = null
+        triedYouTube = false
         position = 0.0; duration = item.durationSec.coerceAtLeast(0).toDouble()
         loadJob = scope.launch {
             try {
@@ -283,9 +286,18 @@ class PlayerController(
                 throw e
             } catch (e: Exception) {
                 e.printStackTrace()
+                // SoundCloud Go+ / region-locked songs: yt-dlp would only get a 30 s preview, so look on YouTube
+                if (e is ContentNotAvailableException && item.serviceId == Service.SOUNDCLOUD.id &&
+                    tryYouTubeInstead(item, "SoundCloud won't stream this song here (${friendlyError(e)}).")
+                ) {
+                    history.add(item)
+                    return@launch
+                }
                 // NewPipeExtractor couldn't handle it (e.g. YouTube changed something): try the yt-dlp backup.
                 if (e !is ReCaptchaException && item.serviceId != Service.SQUIDIFY.id && item.serviceId != Service.LOCAL.id && YtDlp.ready && playWithYtDlp(item, seekTo)) {
                     backupNotice = "NewPipe couldn't load this (${e.message ?: e::class.simpleName}) — playing through the yt-dlp backup."
+                    history.add(item)
+                } else if (item.serviceId == Service.SOUNDCLOUD.id && tryYouTubeInstead(item, "SoundCloud couldn't play this song.")) {
                     history.add(item)
                 } else {
                     loading = false
@@ -323,6 +335,10 @@ class PlayerController(
         } catch (e: Exception) {
             loading = false; error = friendlyError(e); return
         }
+        // SoundCloud sometimes only hands out a 30 second preview (Go+ songs): get the full song from YouTube
+        if (d.item.serviceId == Service.SOUNDCLOUD.id && isSoundCloudPreview(src.mainUrl) &&
+            tryYouTubeInstead(d.item, "SoundCloud only allows a 30-second preview of this song (SoundCloud Go+).")
+        ) return
         val m = mpvOrNull() ?: run { loading = false; return }
         sourceLabel = src.label
         triedYtDlp = false
@@ -347,6 +363,57 @@ class PlayerController(
         val ok = playWithYtDlp(item, position.takeIf { it > 1 })
         if (ok) backupNotice = "The direct stream failed — playing through the yt-dlp backup."
         return ok
+    }
+
+    private fun isSoundCloudPreview(url: String) =
+        url.contains("cf-preview-media") || url.contains("/preview/")
+
+    /**
+     * A SoundCloud song that can't be streamed in full: search YouTube for the same
+     * song (artist + title, similar length) and play that instead. Runs once per song.
+     */
+    private fun tryYouTubeInstead(item: VideoItem, why: String): Boolean {
+        if (item.serviceId != Service.SOUNDCLOUD.id || triedYouTube) return false
+        triedYouTube = true
+        val query = soundCloudQuery(item)
+        if (query.isBlank()) return false
+        loading = true
+        error = null
+        backupNotice = null
+        loadJob?.cancel()
+        loadJob = scope.launch {
+            try {
+                val hits = withContext(Dispatchers.IO) { repo.search(query, Service.YOUTUBE).items }
+                    .filterIsInstance<VideoResult>().map { it.item }.filter { !it.isLive }.take(10)
+                val len = item.durationSec
+                val pick = hits.firstOrNull { len > 0 && it.durationSec > 0 && abs(it.durationSec - len) <= 25 }
+                    ?: hits.firstOrNull()
+                    ?: throw NoStreamsException("$why No match found on YouTube either.")
+                val d = withContext(Dispatchers.IO) { repo.streamDetails(pick.url) }
+                details = d
+                startPlayback(d, null)
+                backupNotice = "$why Playing “${d.item.title}” from YouTube instead."
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                e.printStackTrace()
+                loading = false
+                error = if (e is NoStreamsException) friendlyError(e) else "$why Looking it up on YouTube failed too: ${friendlyError(e)}"
+            }
+        }
+        return true
+    }
+
+    /** "Artist Title", or the artist/song names from the link when the song never loaded. */
+    private fun soundCloudQuery(item: VideoItem): String {
+        if (item.title.isNotBlank() && item.title != "Loading…") {
+            val t = item.title
+            return if (item.uploader.isNotBlank() && !t.contains(item.uploader, ignoreCase = true)) "${item.uploader} $t" else t
+        }
+        val parts = item.url.substringAfter("soundcloud.com/").substringBefore('?').split('/').filter { it.isNotBlank() }
+        return parts.take(2).joinToString(" ") { p ->
+            p.replace('-', ' ').replace('_', ' ').replace(Regex("(?i)official|music$|records?$"), " ").trim()
+        }.replace(Regex("\\s+"), " ").trim()
     }
 
     private fun autoplayRelated() {
@@ -425,9 +492,12 @@ class PlayerController(
             }
             is MpvEvent.EndFile -> when (e.reason) {
                 Mpv.END_EOF -> next()
-                Mpv.END_ERROR -> if (!tryYtDlpFallback()) {
+                Mpv.END_ERROR -> if (!tryYtDlpFallback() &&
+                    !(current?.takeIf { it.serviceId == Service.SOUNDCLOUD.id }
+                        ?.let { tryYouTubeInstead(details?.item ?: it, "SoundCloud couldn't play this song.") } ?: false)
+                ) {
                     loading = false
-                    error = "Playback failed (mpv error ${e.error}). Try a lower quality or audio mode."
+                    error = "Playback failed (mpv error ${e.error})."
                 }
             }
             MpvEvent.Shutdown -> Unit
