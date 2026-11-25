@@ -110,8 +110,8 @@ class ChannelState(val url: String, private val repo: YouTubeRepo, private val s
             try {
                 val d = withContext(Dispatchers.IO) { repo.channel(url) }
                 details = d
-                d.videosTab?.let { t -> videos = Pager(scope) { repo.channelTab(d.ref.serviceId, t) }.also { it.startIfNeeded() } }
-                d.playlistsTab?.let { t -> playlists = Pager(scope) { repo.channelTab(d.ref.serviceId, t) } }
+                d.videos?.let { load -> videos = Pager(scope, load).also { it.startIfNeeded() } }
+                d.playlists?.let { load -> playlists = Pager(scope, load) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

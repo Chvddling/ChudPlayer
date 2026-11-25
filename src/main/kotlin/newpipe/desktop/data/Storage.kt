@@ -51,6 +51,10 @@ data class Settings(
     val shuffle: Boolean = false,
     /** Start the queue again after the last song. */
     val loopQueue: Boolean = false,
+    /** Squidify (Subsonic/Navidrome) server and its public guest login. */
+    val squidifyUrl: String = "https://www.squidify.net",
+    val squidifyUser: String = "Guest",
+    val squidifyPassword: String = "Guest",
 )
 
 class SettingsStore {

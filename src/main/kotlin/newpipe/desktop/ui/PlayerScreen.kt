@@ -150,7 +150,7 @@ private fun InfoStrip(player: PlayerController, actions: VideoActions) {
             Text(item.title, color = Aero.textBright, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val likes = d?.likeCount?.let { formatCount(it) }?.takeIf { it.isNotEmpty() }?.let { "$it likes" }
             val stats = listOfNotNull(
-                formatCount(item.viewCount).takeIf { it.isNotEmpty() }?.let { if (item.serviceId == 1) "$it plays" else "$it views" },
+                formatCount(item.viewCount).takeIf { it.isNotEmpty() }?.let { "$it ${playsWord(item.serviceId)}" },
                 item.uploadDate?.takeIf { it.isNotBlank() },
                 likes,
             ).joinToString(" · ")

@@ -50,26 +50,30 @@ class ListPage(
     }
 }
 
-/** A channel / artist page: its info plus the tabs we show. */
+/** A channel / artist page: its info plus loaders for the two tabs we show. */
 class ChannelDetails(
     val ref: ChannelRef,
     val banner: String?,
-    val videosTab: ListLinkHandler?,
-    val playlistsTab: ListLinkHandler?,
+    /** Uploads / tracks / songs, newest first. */
+    val videos: (() -> ListPage)?,
+    /** Playlists / albums. */
+    val playlists: (() -> ListPage)?,
 )
 
 class NoStreamsException(msg: String) : Exception(msg)
 
 /** All talking to NewPipeExtractor lives here. Every function blocks: call it from Dispatchers.IO. */
-class YouTubeRepo {
+class YouTubeRepo(private val squid: SubsonicClient) {
     private fun np(service: Service): StreamingService = when (service) {
         Service.YOUTUBE -> ServiceList.YouTube
         Service.SOUNDCLOUD -> ServiceList.SoundCloud
+        Service.SQUIDIFY -> throw IllegalStateException("Squidify is not a NewPipe service")
     }
 
     /** Which supported service a link belongs to (YouTube or SoundCloud), or null. */
     fun serviceOfUrl(text: String): Service? = runCatching {
         val url = text.trim()
+        if (SubsonicClient.parse(url)?.first == "song") return@runCatching Service.SQUIDIFY
         val s = NewPipe.getServiceByUrl(url)
         val supported = Service.entries.firstOrNull { it.id == s.serviceId }
         if (supported != null && s.streamLHFactory.acceptUrl(url)) supported else null
@@ -89,9 +93,11 @@ class YouTubeRepo {
             SearchKind.CHANNELS -> "users"
             SearchKind.PLAYLISTS -> "playlists"
         }
+        Service.SQUIDIFY -> ""
     }
 
     fun search(query: String, service: Service = Service.YOUTUBE, kind: SearchKind = SearchKind.ITEMS): ListPage {
+        if (service == Service.SQUIDIFY) return squid.search(query, kind)
         val s = np(service)
         val handler = s.searchQHFactory.fromQuery(query, listOf(filterFor(service, kind)), "")
         val info = SearchInfo.getInfo(s, handler)
@@ -106,6 +112,7 @@ class YouTubeRepo {
     // ---------------- channels / artists ----------------
 
     fun channel(url: String): ChannelDetails {
+        SubsonicClient.parse(url)?.let { (type, id) -> if (type == "artist") return squid.artist(id) }
         val s = NewPipe.getServiceByUrl(url)
         val info = ChannelInfo.getInfo(s, url)
         fun tab(vararg names: String) = info.tabs.firstOrNull { t -> t.contentFilters.any { it in names } }
@@ -117,12 +124,14 @@ class YouTubeRepo {
             description = info.description.orEmpty(),
             serviceId = info.serviceId,
         )
+        // ChannelTabs.VIDEOS / TRACKS, and PLAYLISTS / ALBUMS
+        val videosTab = tab("videos", "tracks")
+        val playlistsTab = tab("playlists", "albums")
         return ChannelDetails(
             ref = ref,
             banner = bestThumbnail(info.banners, target = 400),
-            // ChannelTabs.VIDEOS / TRACKS, and PLAYLISTS / ALBUMS
-            videosTab = tab("videos", "tracks"),
-            playlistsTab = tab("playlists", "albums"),
+            videos = videosTab?.let { t -> { channelTab(info.serviceId, t) } },
+            playlists = playlistsTab?.let { t -> { channelTab(info.serviceId, t) } },
         )
     }
 
@@ -140,6 +149,12 @@ class YouTubeRepo {
     // ---------------- online playlists ----------------
 
     fun playlist(url: String): Pair<PlaylistRef, ListPage> {
+        SubsonicClient.parse(url)?.let { (type, id) ->
+            if (type == "album") {
+                val (ref, songs) = squid.album(id)
+                return ref to ListPage(songs.map { VideoResult(it) }, null, null)
+            }
+        }
         val s = NewPipe.getServiceByUrl(url)
         val info = PlaylistInfo.getInfo(s, url)
         val ref = PlaylistRef(
@@ -161,6 +176,7 @@ class YouTubeRepo {
     }
 
     fun streamDetails(url: String): StreamDetails {
+        SubsonicClient.parse(url)?.let { (type, id) -> if (type == "song") return squidifySong(id) }
         val service = NewPipe.getServiceByUrl(url)
         val info = StreamInfo.getInfo(service, url)
         val item = VideoItem(
@@ -188,6 +204,24 @@ class YouTubeRepo {
             likeCount = info.likeCount,
             related = related,
             heights = heights,
+        )
+    }
+
+    private fun squidifySong(id: String): StreamDetails {
+        val (item, related) = squid.song(id)
+        val text = listOfNotNull(
+            item.uploader.takeIf { it.isNotBlank() }?.let { "Artist: $it" },
+            item.uploadDate?.let { "Album: $it" },
+            "From Squidify (www.squidify.net) — lossless audio where available.",
+        ).joinToString("\n")
+        return StreamDetails(
+            info = null,
+            item = item,
+            description = text,
+            likeCount = -1,
+            related = related,
+            heights = emptyList(),
+            direct = PlaybackSource(squid.streamUrl(id), null, Http.USER_AGENT, "", "Squidify", hasVideo = false),
         )
     }
 

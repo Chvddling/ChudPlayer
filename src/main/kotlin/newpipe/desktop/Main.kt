@@ -32,6 +32,7 @@ import newpipe.desktop.data.PlayMode
 import newpipe.desktop.data.PlaylistStore
 import newpipe.desktop.data.Service
 import newpipe.desktop.data.SettingsStore
+import newpipe.desktop.data.SubsonicClient
 import newpipe.desktop.data.YouTubeRepo
 import newpipe.desktop.player.MpvLib
 import newpipe.desktop.player.PlayerController
@@ -108,7 +109,9 @@ fun main() {
     val settings = SettingsStore()
     val history = HistoryStore()
     val playlists = PlaylistStore()
-    val repo = YouTubeRepo()
+    val repo = YouTubeRepo(
+        SubsonicClient(settings.value.squidifyUrl, settings.value.squidifyUser, settings.value.squidifyPassword),
+    )
 
     application {
         val app = remember { AppState() }

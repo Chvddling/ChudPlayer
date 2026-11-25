@@ -95,6 +95,7 @@ object Aero {
     val lcdDim = Color(0xFF86A7C4)
     val ytRed = Color(0xFFD4231A)
     val scOrange = Color(0xFFE85D00)
+    val squidPurple = Color(0xFF7B4FD6)
     val selectionBorder = Color(0xFF3D7FBF)
 }
 
@@ -107,6 +108,7 @@ object Gloss {
     val button = gloss(Color(0xFF4A5563), Color(0xFF2B333E), Color(0xFF1B2129), Color(0xFF2C343E))
     val orange = gloss(Color(0xFFFFB06A), Color(0xFFFF7417), Color(0xFFE25200), Color(0xFFFF8A30))
     val red = gloss(Color(0xFFFF8A80), Color(0xFFE0261C), Color(0xFFB50E07), Color(0xFFE2392E))
+    val purple = gloss(Color(0xFFC6A8FF), Color(0xFF8457E0), Color(0xFF6438C4), Color(0xFF9468EA))
     val blue = gloss(Color(0xFF8CCBFF), Color(0xFF3A8EE0), Color(0xFF1E6BC2), Color(0xFF4A9DEA))
     val selection = gloss(Color(0x736EB4FF), Color(0x4D3278D2), Color(0x591E5AB4), Color(0x66468CE6))
     val rowSelected = gloss(Color(0xFF3F8AD6), Color(0xFF1F5FAE), Color(0xFF154F99), Color(0xFF2A6FC0))
@@ -119,9 +121,11 @@ object Gloss {
     val progress = Brush.horizontalGradient(listOf(Color(0xFF2D8DE0), Color(0xFF9FD8FF)))
 }
 
-fun serviceName(id: Int) = if (id == 1) "SoundCloud" else "YouTube"
-fun serviceColor(id: Int) = if (id == 1) Aero.scOrange else Aero.ytRed
-fun serviceBrush(id: Int) = if (id == 1) Gloss.orange else Gloss.red
+fun serviceName(id: Int) = newpipe.desktop.data.Service.of(id).label
+fun serviceColor(id: Int) = when (id) { 1 -> Aero.scOrange; 100 -> Aero.squidPurple; else -> Aero.ytRed }
+fun serviceBrush(id: Int) = when (id) { 1 -> Gloss.orange; 100 -> Gloss.purple; else -> Gloss.red }
+/** "plays" for music services, "views" for YouTube. */
+fun playsWord(id: Int) = if (id == 0) "views" else "plays"
 
 @Composable
 fun AppTheme(content: @Composable () -> Unit) {
@@ -478,7 +482,7 @@ fun VideoItem.lengthText(): String = when {
 
 fun VideoItem.subtitle(): String = listOfNotNull(
     uploader.takeIf { it.isNotBlank() },
-    formatCount(viewCount).takeIf { it.isNotEmpty() }?.let { if (serviceId == 1) "$it plays" else "$it views" },
+    formatCount(viewCount).takeIf { it.isNotEmpty() }?.let { "$it ${playsWord(serviceId)}" },
     uploadDate?.takeIf { it.isNotBlank() },
 ).joinToString(" · ")
 

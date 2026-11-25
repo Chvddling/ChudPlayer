@@ -174,7 +174,13 @@ fun ServiceBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        PillGroup(listOf("YouTube", "SoundCloud"), serviceId, onService, selectedBrush = { serviceBrush(it) })
+        val services = newpipe.desktop.data.Service.entries
+        PillGroup(
+            services.map { it.label },
+            services.indexOfFirst { it.id == serviceId }.coerceAtLeast(0),
+            { onService(services[it].id) },
+            selectedBrush = { serviceBrush(services[it].id) },
+        )
         if (kindLabels != null) PillGroup(kindLabels, kind, onKind)
         Text(info, color = Aero.textDim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }

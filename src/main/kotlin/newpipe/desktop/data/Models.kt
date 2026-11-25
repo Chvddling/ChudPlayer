@@ -22,7 +22,9 @@ data class VideoItem(
 /** The sites we support. Ids are NewPipeExtractor's ServiceList ids. */
 enum class Service(val id: Int, val label: String) {
     YOUTUBE(0, "YouTube"),
-    SOUNDCLOUD(1, "SoundCloud");
+    SOUNDCLOUD(1, "SoundCloud"),
+    /** Subsonic/Navidrome server (not a NewPipe service). */
+    SQUIDIFY(100, "Squidify");
 
     companion object {
         fun of(id: Int): Service = entries.firstOrNull { it.id == id } ?: YOUTUBE
@@ -31,13 +33,16 @@ enum class Service(val id: Int, val label: String) {
 
 /** Full info for the video that is currently loaded in the player. */
 class StreamDetails(
-    val info: StreamInfo,
+    /** NewPipe's info (YouTube/SoundCloud); null for Squidify. */
+    val info: StreamInfo?,
     val item: VideoItem,
     val description: String,
     val likeCount: Long,
     val related: List<VideoItem>,
     /** Available video heights (e.g. 1080, 720 …), highest first. */
     val heights: List<Int>,
+    /** A ready-made stream (Squidify). When set, it's played as-is. */
+    val direct: PlaybackSource? = null,
 )
 
 enum class PlayMode { VIDEO, AUDIO }

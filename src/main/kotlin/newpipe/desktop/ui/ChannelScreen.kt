@@ -57,6 +57,7 @@ fun ChannelScreen(state: ChannelState, actions: VideoActions, onBack: (() -> Uni
 @Composable
 private fun ChannelContent(d: ChannelDetails, state: ChannelState, actions: VideoActions, onBack: (() -> Unit)?) {
     val sc = d.ref.serviceId == 1
+    val squid = d.ref.serviceId == 100
     Column(Modifier.fillMaxSize()) {
         // header
         Row(
@@ -72,7 +73,8 @@ private fun ChannelContent(d: ChannelDetails, state: ChannelState, actions: Vide
             Column(Modifier.weight(1f)) {
                 Text(d.ref.name, color = Aero.textBright, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 val subs = formatCount(d.ref.subscribers).takeIf { it.isNotEmpty() }?.let { if (sc) "$it followers" else "$it subscribers" }
-                Text(listOfNotNull(subs, if (sc) "SoundCloud artist" else "YouTube channel").joinToString(" · "), color = Aero.textDim, fontSize = 11.sp)
+                val kindText = when { squid -> "Squidify artist · ${d.ref.streamCount} albums"; sc -> "SoundCloud artist"; else -> "YouTube channel" }
+                Text(listOfNotNull(subs, kindText).joinToString(" · "), color = Aero.textDim, fontSize = 11.sp)
                 if (d.ref.description.isNotBlank()) {
                     Text(d.ref.description.replace('\n', ' '), color = Aero.label, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
@@ -90,8 +92,14 @@ private fun ChannelContent(d: ChannelDetails, state: ChannelState, actions: Vide
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             val labels = buildList {
-                add(if (sc) "Tracks (newest first)" else "Videos (newest first)")
-                if (d.playlistsTab != null) add(if (sc) "Playlists & albums" else "Playlists")
+                add(
+                    when {
+                        squid -> "Songs (newest album first)"
+                        sc -> "Tracks (newest first)"
+                        else -> "Videos (newest first)"
+                    },
+                )
+                if (d.playlists != null) add(if (d.ref.serviceId == 0) "Playlists" else if (sc) "Playlists & albums" else "Albums")
             }
             PillGroup(labels, state.tab.coerceAtMost(labels.lastIndex), { state.selectTab(it) })
             Spacer(Modifier.weight(1f))

@@ -238,7 +238,7 @@ fun TrackCard(item: VideoItem, actions: VideoActions) {
             )
             ChannelLink(item, actions, Aero.textDim, fontSize = 11)
             val stats = listOfNotNull(
-                formatCount(item.viewCount).takeIf { it.isNotEmpty() }?.let { if (item.serviceId == 1) "$it plays" else "$it views" },
+                formatCount(item.viewCount).takeIf { it.isNotEmpty() }?.let { "$it ${playsWord(item.serviceId)}" },
                 item.uploadDate?.takeIf { it.isNotBlank() },
             ).joinToString(" · ")
             if (stats.isNotEmpty()) Text(stats, color = Aero.label, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -299,8 +299,8 @@ fun ChannelCard(ch: ChannelRef, actions: VideoActions) {
             Spacer(Modifier.height(8.dp))
             Text(ch.name, color = Aero.textBright, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val stats = listOfNotNull(
-                formatCount(ch.subscribers).takeIf { it.isNotEmpty() }?.let { if (ch.serviceId == 1) "$it followers" else "$it subscribers" },
-                formatCount(ch.streamCount).takeIf { it.isNotEmpty() }?.let { if (ch.serviceId == 1) "$it tracks" else "$it videos" },
+                formatCount(ch.subscribers).takeIf { it.isNotEmpty() }?.let { if (ch.serviceId == 0) "$it subscribers" else "$it followers" },
+                formatCount(ch.streamCount).takeIf { it.isNotEmpty() }?.let { when (ch.serviceId) { 0 -> "$it videos"; 100 -> "$it albums"; else -> "$it tracks" } },
             ).joinToString(" · ")
             if (stats.isNotEmpty()) Text(stats, color = Aero.textDim, fontSize = 11.sp, maxLines = 1)
             Spacer(Modifier.height(6.dp))

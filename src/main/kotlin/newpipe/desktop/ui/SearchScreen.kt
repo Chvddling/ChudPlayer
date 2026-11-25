@@ -66,7 +66,7 @@ class SearchState(private val repo: YouTubeRepo, private val scope: CoroutineSco
             } catch (e: Exception) {
                 e.printStackTrace()
                 // NewPipeExtractor broken? Ask the yt-dlp backup instead (videos/tracks only).
-                val backup = if (k == SearchKind.ITEMS && YtDlp.ready) {
+                val backup = if (k == SearchKind.ITEMS && svc != Service.SQUIDIFY && YtDlp.ready) {
                     runCatching { withContext(Dispatchers.IO) { YtDlp.search(q, svc) } }.getOrNull()
                 } else null
                 if (!backup.isNullOrEmpty()) {
@@ -101,11 +101,16 @@ class SearchState(private val repo: YouTubeRepo, private val scope: CoroutineSco
         }
     }
 
-    fun kindLabels(): List<String> = listOf(if (service == Service.SOUNDCLOUD) "Tracks" else "Videos", if (service == Service.SOUNDCLOUD) "Artists" else "Channels", "Playlists")
+    fun kindLabels(): List<String> = when (service) {
+        Service.YOUTUBE -> listOf("Videos", "Channels", "Playlists")
+        Service.SOUNDCLOUD -> listOf("Tracks", "Artists", "Playlists")
+        Service.SQUIDIFY -> listOf("Songs", "Artists", "Albums")
+    }
 
     /** Text for the service bar, e.g. 24 results for “outrun”. */
     fun summary(): String = when {
-        lastQuery.isEmpty() -> "Type in the search box (top right). Links to YouTube or SoundCloud play directly."
+        lastQuery.isEmpty() -> if (service == Service.SQUIDIFY) "Squidify: game, anime, movie & TV soundtracks. Type in the search box (top right)."
+            else "Type in the search box (top right). Links to YouTube or SoundCloud play directly."
         loading && results.isEmpty() -> "Searching ${service.label} for “$lastQuery”…"
         error != null -> "Search failed"
         fromBackup -> "${results.size} results for “$lastQuery” (via yt-dlp backup — NewPipe search is having problems)"
