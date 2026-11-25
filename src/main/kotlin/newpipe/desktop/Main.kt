@@ -23,6 +23,9 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import androidx.compose.ui.window.Tray
+import androidx.compose.ui.window.rememberTrayState
+import newpipe.desktop.remote.RemoteServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -78,6 +81,32 @@ class Nav(
     val channel: ChannelState? = null,
     val remote: RemotePlaylistState? = null,
 )
+
+/** The main window's state, for the tray (set once the window exists). */
+private var mainWindow0: androidx.compose.ui.window.WindowState? = null
+
+/** Tray icon: a small glossy blue orb with a play sign. */
+private object TrayIcon : androidx.compose.ui.graphics.painter.Painter() {
+    override val intrinsicSize = androidx.compose.ui.geometry.Size(32f, 32f)
+    override fun androidx.compose.ui.graphics.drawscope.DrawScope.onDraw() {
+        val r = size.minDimension / 2f
+        drawCircle(
+            brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                listOf(androidx.compose.ui.graphics.Color(0xFFD8F0FF), androidx.compose.ui.graphics.Color(0xFF3E9BEA), androidx.compose.ui.graphics.Color(0xFF0E4C90)),
+                center = androidx.compose.ui.geometry.Offset(center.x, size.height * 0.3f),
+                radius = r * 1.6f,
+            ),
+            radius = r,
+        )
+        val path = androidx.compose.ui.graphics.Path().apply {
+            moveTo(size.width * 0.40f, size.height * 0.28f)
+            lineTo(size.width * 0.74f, size.height * 0.50f)
+            lineTo(size.width * 0.40f, size.height * 0.72f)
+            close()
+        }
+        drawPath(path, androidx.compose.ui.graphics.Color.White)
+    }
+}
 
 class AppState {
     var nav by mutableStateOf(Nav(Screen.Search)); private set
@@ -148,13 +177,56 @@ fun main() {
             )
         }
         val updater = remember { Updater(bgScope) }
+        val remote = remember { RemoteServer(player, playlists, history, repo) { local.root } }
+        var windowVisible by remember { mutableStateOf(true) }
+
+        fun quit() {
+            remote.stop()
+            player.shutdown()
+            exitApplication()
+        }
+
+        fun toTray() {
+            if (player.fullscreen) player.changeFullscreen(false)
+            windowVisible = false
+        }
+
+        fun fromTray() {
+            windowVisible = true
+            mainWindow0?.isMinimized = false
+        }
         var autoUpdate by remember { mutableStateOf(settings.value.autoUpdate) }
         LaunchedEffect(Unit) {
             // Keep the yt-dlp backup fresh, then look for a new ChudPlayer release.
             if (settings.value.ytDlpBackup) bgScope.launch { YtDlp.ensure() }
             if (autoUpdate) updater.check(manual = false)
+            // Phone remote: only started if the user turned it on
+            if (settings.value.remoteEnabled) {
+                val token = settings.value.remoteToken.ifEmpty { RemoteServer.newToken() }
+                settings.update { it.copy(remoteToken = token) }
+                remote.start(settings.value.remotePort, token)
+            }
         }
         val mainWindow = rememberWindowState(size = DpSize(1280.dp, 820.dp))
+        mainWindow0 = mainWindow
+
+        // ---------- system tray ----------
+        val trayState = rememberTrayState()
+        Tray(
+            icon = TrayIcon,
+            state = trayState,
+            tooltip = player.current?.let { "ChudPlayer – ${it.title}" } ?: "ChudPlayer",
+            onAction = { fromTray() },
+            menu = {
+                Item("Show ChudPlayer", onClick = { fromTray() })
+                Separator()
+                Item(if (player.paused || player.current == null) "Play" else "Pause", onClick = { player.togglePause() })
+                Item("Next", onClick = { player.next() })
+                Item("Previous", onClick = { player.previous() })
+                Separator()
+                Item("Exit ChudPlayer", onClick = { quit() })
+            },
+        )
         var placementBeforeFullscreen by remember { mutableStateOf(WindowPlacement.Floating) }
 
         LaunchedEffect(player.fullscreen) {
@@ -189,10 +261,10 @@ fun main() {
 
         Window(
             onCloseRequest = {
-                player.shutdown()
-                exitApplication()
+                if (settings.value.closeToTray) toTray() else quit()
             },
             state = mainWindow,
+            visible = windowVisible,
             title = player.current?.let { "${it.title} – ChudPlayer" } ?: "ChudPlayer",
             onKeyEvent = { handleShortcut(it, player) },
         ) {
@@ -248,10 +320,7 @@ fun main() {
                                 onMiniPlayer = ::openMiniPlayer,
                                 updater = updater,
                                 onInstallUpdate = {
-                                    updater.install(exitApp = {
-                                        player.shutdown()
-                                        exitApplication()
-                                    })
+                                    updater.install(exitApp = { quit() })
                                 },
                                 autoUpdate = autoUpdate,
                                 onToggleAutoUpdate = {
@@ -260,6 +329,8 @@ fun main() {
                                 },
                                 onUpdateYtDlp = { bgScope.launch { YtDlp.ensure(force = true) } },
                                 onSettings = { app.settingsOpen = true },
+                                onTray = { toTray() },
+                                remoteOn = remote.running,
                             )
                         }
                     }
@@ -278,6 +349,7 @@ fun main() {
                             settings.update { it.copy(autoUpdate = autoUpdate) }
                         },
                         scope = bgScope,
+                        remote = remote,
                         onClose = { app.settingsOpen = false },
                     )
                 }

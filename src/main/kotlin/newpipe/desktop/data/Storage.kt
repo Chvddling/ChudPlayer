@@ -59,6 +59,12 @@ data class Settings(
     val musicFolder: String = "",
     /** The folder that was open last time in "My Music". */
     val lastLocalFolder: String = "",
+    /** The X button hides ChudPlayer in the tray instead of closing it. */
+    val closeToTray: Boolean = false,
+    /** Phone remote (ChudPlayer Remote app). Off by default. */
+    val remoteEnabled: Boolean = false,
+    val remotePort: Int = 8765,
+    val remoteToken: String = "",
 )
 
 class SettingsStore {

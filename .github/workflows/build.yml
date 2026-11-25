@@ -135,3 +135,33 @@ jobs:
           name: build-reports
           path: build/reports
           if-no-files-found: ignore
+
+  android:
+    # The phone remote app, attached to the same release as the Windows build.
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      APP_VERSION: 1.0.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build ChudPlayer Remote (APK)
+        run: |
+          chmod +x gradlew
+          ./gradlew -p android assembleRelease -PappVersion=$APP_VERSION --console=plain --stacktrace
+
+      - name: Attach APK to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk ChudPlayerRemote.apk
+          gh release upload "v$APP_VERSION" ChudPlayerRemote.apk --clobber

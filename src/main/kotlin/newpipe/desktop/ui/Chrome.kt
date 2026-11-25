@@ -274,6 +274,8 @@ fun StatusBar(
     onToggleAutoUpdate: () -> Unit,
     onUpdateYtDlp: () -> Unit,
     onSettings: () -> Unit,
+    onTray: () -> Unit,
+    remoteOn: Boolean,
 ) {
     Row(
         Modifier.fillMaxWidth().height(28.dp).background(Gloss.statusBar).edgeLine(bottom = false).padding(horizontal = 12.dp),
@@ -281,6 +283,7 @@ fun StatusBar(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         GlossButton("Settings", onSettings, round = false, height = 20.dp)
+        GlossButton("To tray", onTray, round = false, height = 20.dp)
         GlossButton("Mini player", onMiniPlayer, round = false, height = 20.dp)
         val audio = player.mode == PlayMode.AUDIO
         GlossButton(
@@ -315,6 +318,8 @@ fun StatusBar(
         } else if (updater.status.isNotEmpty()) {
             Text(updater.status, color = Aero.textDim, fontSize = 11.sp, maxLines = 1)
         }
+
+        if (remoteOn) Text("● Phone remote on", color = Color(0xFF8FE07F), fontSize = 11.sp)
 
         // Version label: right-click for update options
         ContextMenuArea(items = {

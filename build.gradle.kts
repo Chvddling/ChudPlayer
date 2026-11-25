@@ -36,6 +36,9 @@ dependencies {
 
     // Reads tags and cover art from local music files (mp3, flac, ogg, m4a, wav, wma, aiff…)
     implementation("net.jthink:jaudiotagger:3.0.1")
+
+    // QR code for pairing the phone remote
+    implementation("com.google.zxing:core:3.5.3")
 }
 
 // Bake the version numbers into the app so it can check for updates.

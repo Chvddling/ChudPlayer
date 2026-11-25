@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Glossy blue orb with a play sign, like ChudPlayer's play button -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:pathData="M54,22a32,32 0 1,0 0.01,0z">
+        <aapt:attr xmlns:aapt="http://schemas.android.com/aapt" name="android:fillColor">
+            <gradient android:type="radial" android:centerX="54" android:centerY="34" android:gradientRadius="44">
+                <item android:offset="0" android:color="#FFD8F0FF" />
+                <item android:offset="0.45" android:color="#FF3E9BEA" />
+                <item android:offset="1" android:color="#FF0B3A70" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M34,38a20,13 0 1,0 40,0a20,13 0 1,0 -40,0z" android:fillColor="#40FFFFFF" />
+    <path android:pathData="M46,40L70,54L46,68Z" android:fillColor="#FFFFFFFF" />
+</vector>

@@ -36,6 +36,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import newpipe.desktop.data.LocalMusic
 import newpipe.desktop.data.SettingsStore
+import newpipe.desktop.remote.QrCode
+import newpipe.desktop.remote.RemoteServer
 import newpipe.desktop.update.AppInfo
 import newpipe.desktop.update.Updater
 import newpipe.desktop.update.YtDlp
@@ -72,9 +74,10 @@ fun SettingsWindow(
     autoUpdate: Boolean,
     onToggleAutoUpdate: () -> Unit,
     scope: CoroutineScope,
+    remote: RemoteServer,
     onClose: () -> Unit,
 ) {
-    val state = rememberDialogState(position = WindowPosition(Alignment.Center), size = DpSize(620.dp, 640.dp))
+    val state = rememberDialogState(position = WindowPosition(Alignment.Center), size = DpSize(640.dp, 720.dp))
     DialogWindow(
         onCloseRequest = onClose,
         state = state,
@@ -100,6 +103,60 @@ fun SettingsWindow(
                         }, brush = Gloss.green, textColor = Color.White, bold = true)
                         GlossButton("Use Windows “Music” folder", { local.changeMusicFolder(null) }, enabled = LocalMusic.defaultMusicFolder() != null)
                     }
+                }
+
+                // ---------- Phone remote ----------
+                Section("Phone remote (ChudPlayer Remote app)") {
+                    Text(
+                        "Control ChudPlayer from your Android phone on the same Wi-Fi. Off = nothing runs and no memory is used.",
+                        color = Aero.textDim, fontSize = 11.sp,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Toggle("Phone remote", remote.running) { on ->
+                            if (on) {
+                                val token = settings.value.remoteToken.ifEmpty { RemoteServer.newToken() }
+                                settings.update { it.copy(remoteEnabled = true, remoteToken = token) }
+                                remote.start(settings.value.remotePort, token)
+                            } else {
+                                settings.update { it.copy(remoteEnabled = false) }
+                                remote.stop()
+                            }
+                        }
+                        if (remote.running) {
+                            GlossButton("New pairing code", {
+                                val token = RemoteServer.newToken()
+                                settings.update { it.copy(remoteToken = token) }
+                                remote.start(settings.value.remotePort, token)
+                            })
+                        }
+                        GlossButton("Get the app (APK)", { openInBrowser("https://github.com/${AppInfo.REPO}/releases/latest") })
+                    }
+                    remote.error?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 11.sp) }
+                    if (remote.running) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            QrCode(remote.pairingLink(), 200.dp)
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("1. Install ChudPlayer Remote on your phone", color = Aero.text, fontSize = 12.sp)
+                                Text("2. Open it and tap “Scan QR code”", color = Aero.text, fontSize = 12.sp)
+                                Text("Or type it in by hand:", color = Aero.textDim, fontSize = 11.sp)
+                                val addrs = RemoteServer.lanAddresses()
+                                Text("Address: " + (addrs.firstOrNull() ?: "?") + "   Port: ${remote.port}", color = Aero.textBright, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                Text("Pairing code: ${remote.token}", color = Aero.textBright, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                if (addrs.size > 1) Text("Other addresses: " + addrs.drop(1).joinToString(), color = Aero.textDim, fontSize = 11.sp)
+                                Text("If Windows asks about the firewall, allow ChudPlayer on private networks.", color = Aero.textDim, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+
+                // ---------- Tray ----------
+                Section("System tray") {
+                    var tray by remember { mutableStateOf(settings.value.closeToTray) }
+                    Toggle("Close button sends ChudPlayer to the tray", tray) {
+                        tray = it
+                        settings.update { s -> s.copy(closeToTray = it) }
+                    }
+                    Text("Use “To tray” in the bottom bar any time. Click the tray icon to bring ChudPlayer back; right-click it for play/pause, next and exit.", color = Aero.textDim, fontSize = 11.sp)
                 }
 
                 // ---------- Updates ----------

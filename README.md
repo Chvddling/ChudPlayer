@@ -14,6 +14,25 @@ the Android [NewPipe](https://newpipe.net) app uses to read YouTube and SoundClo
    Avoid `Program Files`, because the auto-updater can't write there.
 3. Run `ChudPlayer.exe`. Java is bundled, so you don't need to install anything.
 
+## Phone remote (Android)
+
+**ChudPlayer Remote** controls ChudPlayer from your phone over your home Wi-Fi. You can see what's playing,
+play/pause/skip, seek, change the volume (the phone's volume buttons work too), switch repeat/shuffle/loop/autoplay,
+search YouTube/SoundCloud/Squidify, manage the queue (drag to reorder, swipe to remove), and play your playlists,
+history and My Music folders. Your phone doesn't play the music; ChudPlayer on the PC does.
+
+1. In ChudPlayer open **Settings → Phone remote** and turn it on. It's off by default, and when it's off it doesn't run at all.
+2. Download `ChudPlayerRemote.apk` from **[Releases](../../releases/latest)** on your phone and install it
+   (Android asks you to allow installing from your browser the first time).
+3. Open the app, tap **Scan QR code** and scan the code shown in ChudPlayer's Settings.
+   If Windows asks about the firewall, allow ChudPlayer on **private** networks.
+
+The phone only connects inside your home network and needs the pairing code from the QR code.
+To lock out old phones, use "New pairing code" in Settings.
+
+The APK is signed with a key kept in this repo (`android/keystore`), so every new APK installs over the old one.
+That also means anyone could sign an APK with the same key, so only install ChudPlayer Remote from this repo's Releases.
+
 ## Staying up to date (automatically)
 
 YouTube changes things often, and that's what breaks clients like NewPipe. ChudPlayer handles it on its own:
@@ -40,6 +59,8 @@ off and on, or update yt-dlp.
   Choose the main music folder in **Settings**; the last opened folder is remembered.
 - Playback modes in the top bar: repeat song, shuffle, loop queue, autoplay
 - Hold and drag songs in the queue or your playlists to reorder them
+- **System tray**: send ChudPlayer to the tray ("To tray" button, or make the close button do it in Settings);
+  click the tray icon to bring it back, right-click it for play/pause, next, previous and exit
 - Channel / artist pages (uploads newest first, playlists, search inside a channel), history search
 - Embedded video player (mpv) with quality picker, fullscreen (F11 / double-click), volume and seeking
 - **Audio only** mode, which is NewPipe's background player
