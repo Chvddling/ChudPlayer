@@ -81,7 +81,6 @@ private fun ChannelContent(d: ChannelDetails, state: ChannelState, actions: Vide
             }
             val uploads = state.videos?.videos().orEmpty()
             GlossButton("Play uploads", { actions.playAll(uploads) }, enabled = uploads.isNotEmpty(), brush = Gloss.blue, textColor = Color.White, bold = true)
-            GlossButton("Background", { actions.backgroundAll(uploads) }, enabled = uploads.isNotEmpty())
             GlossButton("Save uploads as playlist", { actions.newPlaylist(uploads, d.ref.name) }, enabled = uploads.isNotEmpty())
         }
 
@@ -180,7 +179,6 @@ fun RemotePlaylistScreen(state: RemotePlaylistState, actions: VideoActions, onBa
             val ready = pager.items.isNotEmpty() && !state.busy
             GlossButton(if (state.busy) "Loading all…" else "Play", { state.withAllVideos { actions.playAll(it) } }, enabled = ready, brush = Gloss.blue, textColor = Color.White, bold = true)
             GlossButton("Shuffle", { state.withAllVideos { actions.shuffle(it) } }, enabled = ready)
-            GlossButton("Background", { state.withAllVideos { actions.backgroundAll(it) } }, enabled = ready)
             GlossButton("Save as my playlist", { state.withAllVideos { actions.newPlaylist(it, ref.name) } }, enabled = ready)
         }
 

@@ -3,8 +3,6 @@ package newpipe.desktop.player
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.geometry.Rect
-import com.sun.jna.Native
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,29 +24,14 @@ import newpipe.desktop.update.YtDlp
 import org.schabi.newpipe.extractor.exceptions.AgeRestrictedContentException
 import org.schabi.newpipe.extractor.exceptions.ContentNotAvailableException
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException
-import java.awt.Canvas
 import java.util.concurrent.Executors
 import kotlin.math.abs
-
-/**
- * The heavyweight AWT canvas mpv renders into. It lives for the whole app
- * (destroying it under a running mpv would crash), and the UI only moves it around.
- */
-class VideoHost {
-    val canvas = Canvas().apply { background = java.awt.Color.BLACK }
-
-    /** Where the video should be drawn, in window coordinates. null = hidden. */
-    var bounds by mutableStateOf<Rect?>(null)
-
-    fun windowId(): Long? = if (canvas.isDisplayable) Native.getComponentID(canvas) else null
-}
 
 /** Player state + queue. All public state is Compose state; all mpv calls run on one background thread. */
 class PlayerController(
     private val repo: YouTubeRepo,
     private val history: HistoryStore,
     private val settings: SettingsStore,
-    val video: VideoHost,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val mpvExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "mpv-commands").apply { isDaemon = true } }
@@ -61,7 +44,8 @@ class PlayerController(
     var details by mutableStateOf<StreamDetails?>(null); private set
     var sourceLabel by mutableStateOf(""); private set
     /** false while playing something without a picture (SoundCloud, audio mode). */
-    var hasVideo by mutableStateOf(true); private set
+    /** ChudPlayer is audio only (no video decoding, to save memory). */
+    val hasVideo = false
     /** Set when NewPipeExtractor failed and yt-dlp is playing instead. */
     var backupNotice by mutableStateOf<String?>(null); private set
     var loading by mutableStateOf(false); private set
@@ -72,12 +56,17 @@ class PlayerController(
     var position by mutableStateOf(0.0); private set
     var duration by mutableStateOf(0.0); private set
     var volume by mutableStateOf(settings.value.volume.toFloat()); private set
-    var fullscreen by mutableStateOf(false); private set
 
-    var mode by mutableStateOf(runCatching { PlayMode.valueOf(settings.value.mode) }.getOrDefault(PlayMode.VIDEO)); private set
-    var maxHeight by mutableStateOf(settings.value.maxHeight); private set
+    val mode = PlayMode.AUDIO
+    /** Only used if a stream has no separate audio: take the smallest video and play its sound. */
+    private val maxHeight = 360
     var autoplay by mutableStateOf(settings.value.autoplay); private set
     var repeatOne by mutableStateOf(settings.value.repeatOne); private set
+
+    /** Height of the queue panel on "Now Playing", dragged with the splitter above it. */
+    var queuePanelHeight by mutableStateOf(settings.value.queuePanelHeight.toFloat()); private set
+    fun changeQueuePanelHeight(dp: Float) { queuePanelHeight = dp }
+    fun saveQueuePanelHeight() = settings.update { it.copy(queuePanelHeight = queuePanelHeight.toInt()) }
     var shuffle by mutableStateOf(settings.value.shuffle); private set
     var loopQueue by mutableStateOf(settings.value.loopQueue); private set
 
@@ -125,17 +114,12 @@ class PlayerController(
 
     /** "Play in background": audio only. */
     fun playInBackground(item: VideoItem) {
-        if (mode != PlayMode.AUDIO) { mode = PlayMode.AUDIO; settings.update { it.copy(mode = mode.name) } }
         addAndPlay(item)
     }
 
     /** Play a whole playlist: in order, shuffled, and/or audio only. */
     fun playCollection(items: List<VideoItem>, start: Int = 0, shuffle: Boolean = false, audioOnly: Boolean = false) {
         if (items.isEmpty()) return
-        if (audioOnly && mode != PlayMode.AUDIO) {
-            mode = PlayMode.AUDIO
-            settings.update { it.copy(mode = mode.name) }
-        }
         if (shuffle) play(items.shuffled()) else play(items, start)
     }
 
@@ -262,26 +246,6 @@ class PlayerController(
         if (save) settings.update { it.copy(volume = v.toInt()) }
     }
 
-    fun changeFullscreen(fs: Boolean) {
-        fullscreen = fs
-        mpvCmd { it.setProperty("fullscreen", if (fs) "yes" else "no") }
-    }
-
-    fun changeMode(m: PlayMode) {
-        if (m == mode) return
-        mode = m
-        settings.update { it.copy(mode = m.name) }
-        if (m == PlayMode.AUDIO && fullscreen) changeFullscreen(false)
-        restartAtCurrentPosition()
-    }
-
-    fun changeMaxHeight(h: Int) {
-        if (h == maxHeight) return
-        maxHeight = h
-        settings.update { it.copy(maxHeight = h) }
-        if (mode == PlayMode.VIDEO) restartAtCurrentPosition()
-    }
-
     fun changeAutoplay(on: Boolean) {
         autoplay = on
         settings.update { it.copy(autoplay = on) }
@@ -337,28 +301,20 @@ class PlayerController(
         triedYtDlp = true
         pendingAudio = null
         pendingSeek = seekTo
-        hasVideo = mode == PlayMode.VIDEO && item.serviceId != 1
         sourceLabel = "yt-dlp backup"
         loading = true
         error = null
-        val format = if (!hasVideo) "bestaudio/best" else "bestvideo[height<=?$maxHeight]+bestaudio/best"
+        val format = "bestaudio/best"
         val title = item.title
-        val audioOnly = !hasVideo
         scope.launch(mpvThread) {
             m.setProperty("user-agent", "")
             m.setProperty("http-header-fields", "")
             m.setProperty("ytdl-format", format)
-            m.setProperty("vid", if (audioOnly) "no" else "auto")
             m.setProperty("force-media-title", title)
             m.command("loadfile", item.url, "replace")
             m.setProperty("pause", "no")
         }
         return true
-    }
-
-    private fun restartAtCurrentPosition() {
-        val d = details ?: return
-        startPlayback(d, position.takeIf { it > 1 && !d.item.isLive })
     }
 
     private fun startPlayback(d: StreamDetails, seekTo: Double?) {
@@ -369,17 +325,14 @@ class PlayerController(
         }
         val m = mpvOrNull() ?: run { loading = false; return }
         sourceLabel = src.label
-        hasVideo = src.hasVideo
         triedYtDlp = false
         loading = true
         pendingAudio = src.audioUrl
         pendingSeek = seekTo
-        val audioOnly = mode == PlayMode.AUDIO || !src.hasVideo
         val title = d.item.title
         scope.launch(mpvThread) {
             m.setProperty("user-agent", src.userAgent)
             m.setProperty("http-header-fields", src.headers)
-            m.setProperty("vid", if (audioOnly) "no" else "auto")
             m.setProperty("force-media-title", title)
             m.command("loadfile", src.mainUrl, "replace")
             m.setProperty("pause", "no")
@@ -416,7 +369,7 @@ class PlayerController(
             mpv = null
         }
         return try {
-            Mpv(video.windowId(), ytdl, ::onMpvEvent).also {
+            Mpv(ytdl, ::onMpvEvent).also {
                 it.setProperty("volume", volume.toInt().toString())
                 if (repeatOne) it.setProperty("loop-file", "inf")
                 mpv = it
@@ -448,15 +401,16 @@ class PlayerController(
         when (e) {
             is MpvEvent.Property -> when (e.name) {
                 "pause" -> paused = e.value as? Boolean ?: false
-                "time-pos" -> (e.value as? Double)?.let { position = it }
+                "time-pos" -> (e.value as? Double)?.let { p ->
+                    // Repeat song: mpv jumps back to the start on its own, and every loop is another play
+                    if (repeatOne && duration > 3 && position > duration - 1.5 && p < 1.5) {
+                        (details?.item ?: current)?.let { history.add(it) }
+                    }
+                    position = p
+                }
                 "duration" -> (e.value as? Double)?.let { duration = it }
                 "paused-for-cache" -> buffering = e.value as? Boolean ?: false
                 "volume" -> (e.value as? Double)?.let { volume = it.toFloat() }
-                "fullscreen" -> {
-                    // mpv's own fullscreen (double click / F key on the video) → mirror on our window.
-                    val fs = e.value as? Boolean ?: false
-                    if (fs != fullscreen && mode == PlayMode.VIDEO && hasVideo) fullscreen = fs
-                }
             }
             MpvEvent.FileLoaded -> {
                 loading = false

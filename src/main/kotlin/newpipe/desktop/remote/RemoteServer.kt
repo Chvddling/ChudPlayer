@@ -28,7 +28,6 @@ import newpipe.desktop.data.ChannelRef
 import newpipe.desktop.data.HistoryStore
 import newpipe.desktop.data.ListPage
 import newpipe.desktop.data.LocalMusic
-import newpipe.desktop.data.PlayMode
 import newpipe.desktop.data.PlaylistRef
 import newpipe.desktop.data.PlaylistStore
 import newpipe.desktop.data.SearchItem
@@ -272,7 +271,7 @@ class RemoteServer(
             "shuffle" -> player.changeShuffle(o.bool("on") ?: !player.shuffle)
             "loopQueue" -> player.changeLoopQueue(o.bool("on") ?: !player.loopQueue)
             "autoplay" -> player.changeAutoplay(o.bool("on") ?: !player.autoplay)
-            "audio" -> player.changeMode(if (o.bool("on") == true) PlayMode.AUDIO else PlayMode.VIDEO)
+            "audio" -> Unit // always audio only now
             "play" -> o.video()?.let { player.addAndPlay(it) }
             "playNext" -> o.video()?.let { player.playNext(it) }
             "enqueue" -> o.video()?.let { player.enqueue(it) }

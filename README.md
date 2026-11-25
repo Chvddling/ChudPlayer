@@ -67,7 +67,9 @@ off and on, or update yt-dlp.
 - **System tray**: send ChudPlayer to the tray ("To tray" button, or make the close button do it in Settings);
   click the tray icon to bring it back, right-click it for play/pause, next, previous and exit
 - Channel / artist pages (uploads newest first, playlists, search inside a channel), history search
-- Embedded video player (mpv) with quality picker, fullscreen (F11 / double-click), volume and seeking
+- Audio-only player (mpv) with cover art, volume and seeking — no video decoding, so it stays light on memory
+- Now Playing: drag the bar above the queue to give more room to the cover art or to the queue (double-click resets it)
+- History counts plays and can be sorted by Recent or Most played
 - **Mini player**: a small always-on-top window, while the main window gets minimized
 - Queue, autoplay of related videos, watch history
 - **Local playlists**: create, rename, reorder, play, shuffle or play in background
@@ -81,11 +83,8 @@ Your data lives in `%APPDATA%\ChudPlayer\` (`playlists.json`, `history.json`, `s
 |---|---|
 | Space | Play / pause |
 | ← / → | Seek 5 s |
-| F11 | Fullscreen |
-| Esc | Exit fullscreen |
 | Media keys | Play/pause, next, previous (while the window has focus) |
 
-When you click on the video, mpv's own shortcuts work too (`f`, `m`, `9`/`0` volume, `[`/`]` speed…).
 
 ## Building it yourself
 

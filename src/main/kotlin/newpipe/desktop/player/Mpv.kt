@@ -63,32 +63,32 @@ sealed interface MpvEvent {
 }
 
 /**
- * One mpv instance. If [windowId] is given (an HWND), mpv draws into that window,
- * which is how the video is embedded in the Compose UI.
+ * One mpv instance, audio only: ChudPlayer never decodes video, which keeps
+ * memory, CPU and network use low.
  */
-class Mpv(windowId: Long?, ytdlPath: String?, private val listener: (MpvEvent) -> Unit) {
+class Mpv(ytdlPath: String?, private val listener: (MpvEvent) -> Unit) {
     private val lib = MpvLib.instance
     private val ctx: Pointer = lib.mpv_create() ?: throw IllegalStateException("mpv_create() failed")
     private val thread: Thread
     @Volatile private var alive = true
 
     init {
-        windowId?.let { option("wid", it.toString()) }
-        option("hwdec", "auto-safe")
-        option("osc", "yes")                       // mpv's own on-screen controller over the video
-        option("input-default-bindings", "yes")    // mpv keyboard/mouse shortcuts when the video has focus
-        option("input-vo-keyboard", "yes")
+        option("vid", "no")                        // never pick a video track (also skips embedded cover art)
+        option("vo", "null")
+        option("osc", "no")
+        option("input-default-bindings", "no")
         option("idle", "yes")
-        option("force-window", if (windowId != null) "yes" else "no")
+        option("force-window", "no")
         option("keep-open", "no")
         option("audio-display", "no")
         option("ytdl", "yes")                      // yt-dlp fallback
+        option("ytdl-format", "bestaudio/best")
         if (ytdlPath != null) option("script-opts", "ytdl_hook-ytdl_path=$ytdlPath")
         option("cache", "yes")
-        option("demuxer-max-bytes", "150MiB")
+        option("demuxer-max-bytes", "16MiB")       // audio only: minutes of music
+        option("demuxer-max-back-bytes", "4MiB")
         option("demuxer-readahead-secs", "20")
         option("network-timeout", "30")
-        option("cursor-autohide", "1000")
         option("volume-max", "150")
 
         val rc = lib.mpv_initialize(ctx)
@@ -103,8 +103,6 @@ class Mpv(windowId: Long?, ytdlPath: String?, private val listener: (MpvEvent) -
         observe("duration", FORMAT_DOUBLE)
         observe("paused-for-cache", FORMAT_FLAG)
         observe("volume", FORMAT_DOUBLE)
-        observe("fullscreen", FORMAT_FLAG)
-        observe("height", FORMAT_INT64)
 
         thread = Thread(::eventLoop, "mpv-events").apply { isDaemon = true; start() }
     }

@@ -30,18 +30,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import newpipe.desktop.data.HistoryStore
+import newpipe.desktop.data.SettingsStore
 
 @Composable
-fun HistoryScreen(history: HistoryStore, actions: VideoActions) {
+fun HistoryScreen(history: HistoryStore, actions: VideoActions, settings: SettingsStore) {
     var filter by remember { mutableStateOf("") }
+    var byPlays by remember { mutableStateOf(settings.value.historySort == "plays") }
     val words = filter.trim().lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
-    val shown = if (words.isEmpty()) history.entries else history.entries.filter { e ->
+    val matching = if (words.isEmpty()) history.entries else history.entries.filter { e ->
         val text = (e.item.title + " " + e.item.uploader).lowercase()
         words.all { it in text }
     }
+    // Most played first; ties go to the one played most recently (the list is already newest first)
+    val shown = if (byPlays) matching.sortedByDescending { it.plays } else matching
     Column(Modifier.fillMaxSize()) {
         val subtitle = if (words.isEmpty()) "${history.entries.size} played" else "${shown.size} of ${history.entries.size} match “${filter.trim()}”"
         PageHeader("History", subtitle) {
+            PillGroup(listOf("Recent", "Most played"), if (byPlays) 1 else 0, { i ->
+                byPlays = i == 1
+                settings.update { it.copy(historySort = if (byPlays) "plays" else "recent") }
+            })
             GlassSearchField(filter, { filter = it }, {}, Modifier.width(240.dp), placeholder = "Search history")
             val items = shown.map { it.item }
             GlossButton("Play all", { actions.playAll(items) }, enabled = items.isNotEmpty(), brush = Gloss.blue, textColor = Color.White, bold = true)
@@ -53,7 +61,7 @@ fun HistoryScreen(history: HistoryStore, actions: VideoActions) {
         } else if (shown.isEmpty()) {
             CenterMessage("Nothing in your history matches “${filter.trim()}”.")
         } else {
-            TrackHeader()
+            TrackHeader(trailingLabel = "Plays", trailingWidth = 50.dp)
             val state = rememberLazyListState()
             Box(Modifier.fillMaxSize()) {
                 LazyColumn(Modifier.fillMaxSize(), state = state) {
@@ -65,7 +73,9 @@ fun HistoryScreen(history: HistoryStore, actions: VideoActions) {
                             onClick = { actions.play(e.item) },
                             actions = actions,
                             extraMenu = { listOf(ContextMenuItem("Remove from history") { history.remove(e.item.url) }) },
-                        )
+                        ) {
+                            Text("${e.plays}", Modifier.width(50.dp), color = Aero.textDim, fontSize = 12.sp)
+                        }
                     }
                 }
                 VerticalScrollbar(rememberScrollbarAdapter(state), Modifier.align(Alignment.CenterEnd).fillMaxHeight())

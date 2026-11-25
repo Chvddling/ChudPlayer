@@ -321,7 +321,7 @@ private fun PlayingScreen(vm: RemoteViewModel) {
         if (vm.volumeKeys) Text("Phone volume buttons control the PC", color = Aero.label, fontSize = 10.sp)
         Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (s.hasVideo || s.mode == "AUDIO") {
+            if (s.hasVideo) {
                 PillGroup(listOf("Video", "Audio"), if (s.mode == "AUDIO") 1 else 0, { vm.audioOnly(it == 1) })
             }
             GlossButton("+ Playlist", { vm.pickPlaylistFor = listOf(cur) })
@@ -529,7 +529,6 @@ private fun PlaylistsList(vm: RemoteViewModel) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 8.dp)) {
                         GlossButton("Play", { vm.playPlaylist(p.id) }, brush = Gloss.blue, textColor = Color.White, bold = true, height = 28.dp, enabled = p.count > 0)
                         GlossButton("Shuffle", { vm.playPlaylist(p.id, shuffle = true) }, height = 28.dp, enabled = p.count > 0)
-                        GlossButton("Background", { vm.playPlaylist(p.id, audio = true) }, height = 28.dp, enabled = p.count > 0)
                     }
                 }
             }
@@ -748,7 +747,6 @@ private fun ActionSheet(vm: RemoteViewModel, item: Item) {
         SheetAction("▶  Play now") { close(); vm.play(item) }
         SheetAction("⤷  Play next") { close(); vm.playNext(item) }
         SheetAction("＋  Add to queue") { close(); vm.enqueue(item) }
-        SheetAction("◐  Play in background (audio only)") { close(); vm.background(item) }
         SheetAction("☰  Add to playlist…") { close(); vm.pickPlaylistFor = listOf(item) }
         val up = item.uploaderUrl
         if (!up.isNullOrBlank()) {

@@ -416,9 +416,59 @@ fun CenterMessage(text: String, modifier: Modifier = Modifier) {
 
 // ---------------- images ----------------
 
+/**
+ * Thumbnails and covers, scaled down to at most [MAX_SIDE] px and kept in a
+ * least-recently-used cache capped by memory size rather than by count.
+ */
 object ImageCache {
-    private val cache = object : LinkedHashMap<String, ImageBitmap>(256, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageBitmap>?) = size > 400
+    private const val MAX_SIDE = 800
+    private const val BUDGET_BYTES = 64L * 1024 * 1024
+
+    private val cache = LinkedHashMap<String, ImageBitmap>(128, 0.75f, true)
+    private var bytes = 0L
+
+    private fun sizeOf(b: ImageBitmap) = b.width.toLong() * b.height * 4
+
+    fun clear() = synchronized(cache) { cache.clear(); bytes = 0 }
+
+    private fun put(url: String, bmp: ImageBitmap) = synchronized(cache) {
+        cache.put(url, bmp)?.let { bytes -= sizeOf(it) }
+        bytes += sizeOf(bmp)
+        val it = cache.entries.iterator()
+        while (bytes > BUDGET_BYTES && cache.size > 1 && it.hasNext()) {
+            val e = it.next()
+            if (e.key == url) continue
+            bytes -= sizeOf(e.value)
+            it.remove()
+        }
+    }
+
+    /** Decode and shrink in one go, so full-size bitmaps never stay around. */
+    private fun decode(data: ByteArray): ImageBitmap? {
+        val img = org.jetbrains.skia.Image.makeFromEncoded(data)
+        try {
+            val side = maxOf(img.width, img.height)
+            if (side <= MAX_SIDE) return img.toComposeImageBitmap()
+            val scale = MAX_SIDE.toFloat() / side
+            val w = maxOf(1, (img.width * scale).toInt())
+            val h = maxOf(1, (img.height * scale).toInt())
+            val surface = org.jetbrains.skia.Surface.makeRasterN32Premul(w, h)
+            try {
+                surface.canvas.drawImageRect(
+                    img,
+                    org.jetbrains.skia.Rect.makeWH(img.width.toFloat(), img.height.toFloat()),
+                    org.jetbrains.skia.Rect.makeWH(w.toFloat(), h.toFloat()),
+                    org.jetbrains.skia.FilterMipmap(org.jetbrains.skia.FilterMode.LINEAR, org.jetbrains.skia.MipmapMode.LINEAR),
+                    null,
+                    true,
+                )
+                return surface.makeImageSnapshot().use { it.toComposeImageBitmap() }
+            } finally {
+                surface.close()
+            }
+        } finally {
+            img.close()
+        }
     }
 
     suspend fun load(url: String): ImageBitmap? {
@@ -428,17 +478,15 @@ object ImageCache {
                 // Local album art: embedded in the file or cover.jpg next to it
                 if (url.startsWith(newpipe.desktop.data.LocalMusic.COVER_PREFIX)) {
                     val f = java.io.File(url.removePrefix(newpipe.desktop.data.LocalMusic.COVER_PREFIX))
-                    return@runCatching newpipe.desktop.data.LocalMusic.cover(f)
-                        ?.let { org.jetbrains.skia.Image.makeFromEncoded(it).toComposeImageBitmap() }
+                    return@runCatching newpipe.desktop.data.LocalMusic.cover(f)?.let { decode(it) }
                 }
                 val req = okhttp3.Request.Builder().url(url).header("User-Agent", Http.USER_AGENT).build()
                 Http.client.newCall(req).execute().use { resp ->
-                    if (!resp.isSuccessful) null
-                    else resp.body?.bytes()?.let { org.jetbrains.skia.Image.makeFromEncoded(it).toComposeImageBitmap() }
+                    if (!resp.isSuccessful) null else resp.body?.bytes()?.let { decode(it) }
                 }
             }.getOrNull()
         } ?: return null
-        synchronized(cache) { cache[url] = bmp }
+        put(url, bmp)
         return bmp
     }
 }

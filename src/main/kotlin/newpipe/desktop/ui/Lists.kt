@@ -90,7 +90,6 @@ class VideoActions(
             ContextMenuItem("Play now") { play(item) },
             ContextMenuItem("Play next") { playNext(item) },
             ContextMenuItem("Add to queue") { enqueue(item) },
-            ContextMenuItem("Play in background (audio only)") { background(item) },
             ContextMenuItem("Add to playlist…") { addToPlaylist(listOf(item)) },
         )
         if (!item.uploaderUrl.isNullOrBlank()) {
@@ -134,7 +133,7 @@ private fun HeaderCell(text: String, modifier: Modifier) {
 }
 
 @Composable
-fun TrackHeader(trailingWidth: Dp = 0.dp) {
+fun TrackHeader(trailingWidth: Dp = 0.dp, trailingLabel: String = "") {
     Row(
         Modifier
             .fillMaxWidth()
@@ -149,7 +148,10 @@ fun TrackHeader(trailingWidth: Dp = 0.dp) {
         HeaderCell("Channel / Artist", Modifier.weight(2f))
         HeaderCell("Time", Modifier.width(colTime))
         HeaderCell("Source", Modifier.width(colSource))
-        if (trailingWidth > 0.dp) Spacer(Modifier.width(trailingWidth))
+        if (trailingWidth > 0.dp) {
+            if (trailingLabel.isNotEmpty()) HeaderCell(trailingLabel, Modifier.width(trailingWidth))
+            else Spacer(Modifier.width(trailingWidth))
+        }
     }
 }
 

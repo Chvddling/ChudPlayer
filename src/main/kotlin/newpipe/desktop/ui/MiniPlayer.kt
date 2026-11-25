@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
-import newpipe.desktop.data.PlayMode
 import newpipe.desktop.player.PlayerController
 
 /**
@@ -70,13 +69,6 @@ fun MiniPlayerWindow(player: PlayerController, onClose: () -> Unit, onRestore: (
                             )
                             OrbButton({ player.next() }, "Next", Icons.Filled.SkipNext, 28.dp)
                             Spacer(Modifier.weight(1f))
-                            val audio = player.mode == PlayMode.AUDIO
-                            GlossButton(
-                                if (audio) "Audio ✓" else "Audio",
-                                { player.changeMode(if (audio) PlayMode.VIDEO else PlayMode.AUDIO) },
-                                brush = if (audio) Gloss.blue else Gloss.button,
-                                textColor = if (audio) Color.White else Aero.text,
-                            )
                             GlossButton("Open", onRestore)
                         }
                     }

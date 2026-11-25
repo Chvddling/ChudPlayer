@@ -55,7 +55,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import newpipe.desktop.data.PlayMode
 import newpipe.desktop.data.PlaylistStore
 import newpipe.desktop.player.PlayerController
 import newpipe.desktop.update.AppInfo
@@ -222,7 +221,6 @@ fun SourceList(
                         listOf(
                             ContextMenuItem("Play") { actions.playAll(p.items) },
                             ContextMenuItem("Shuffle") { actions.shuffle(p.items) },
-                            ContextMenuItem("Play in background (audio only)") { actions.backgroundAll(p.items) },
                             ContextMenuItem("Add all to queue") { p.items.forEach { actions.enqueue(it) } },
                             ContextMenuItem("Rename…") { actions.renamePlaylist(p.id, p.name) },
                             ContextMenuItem("Delete…") { actions.deletePlaylist(p.id, p.name) },
@@ -285,14 +283,6 @@ fun StatusBar(
         GlossButton("Settings", onSettings, round = false, height = 20.dp)
         GlossButton("To tray", onTray, round = false, height = 20.dp)
         GlossButton("Mini player", onMiniPlayer, round = false, height = 20.dp)
-        val audio = player.mode == PlayMode.AUDIO
-        GlossButton(
-            if (audio) "Audio only ✓" else "Audio only",
-            { player.changeMode(if (audio) PlayMode.VIDEO else PlayMode.AUDIO) },
-            brush = if (audio) Gloss.blue else Gloss.button,
-            textColor = if (audio) Color.White else Aero.text,
-            round = false, height = 20.dp,
-        )
         val modes = listOfNotNull(
             "Repeat song".takeIf { player.repeatOne },
             "Shuffle".takeIf { player.shuffle },

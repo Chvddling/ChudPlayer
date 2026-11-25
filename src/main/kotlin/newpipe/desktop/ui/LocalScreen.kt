@@ -268,7 +268,6 @@ private fun FolderTracks(state: LocalState, actions: VideoActions, modifier: Mod
             val has = tracks.isNotEmpty()
             GlossButton("Play folder", { actions.playAll(tracks) }, enabled = has, brush = Gloss.green, textColor = Color.White, bold = true)
             GlossButton("Shuffle", { actions.shuffle(tracks) }, enabled = has)
-            GlossButton("Background", { actions.backgroundAll(tracks) }, enabled = has)
             GlossButton("Add to queue", { tracks.forEach { actions.enqueue(it) } }, enabled = has)
             GlossButton("Save as playlist", { actions.newPlaylist(tracks, dir?.displayName().orEmpty()) }, enabled = has)
         }

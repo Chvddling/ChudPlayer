@@ -65,6 +65,10 @@ data class Settings(
     val remoteEnabled: Boolean = false,
     val remotePort: Int = 8765,
     val remoteToken: String = "",
+    /** Height of the queue panel under the video on "Now Playing" (dp). */
+    val queuePanelHeight: Int = 260,
+    /** History sort: "recent" or "plays". */
+    val historySort: String = "recent",
 )
 
 class SettingsStore {
@@ -80,7 +84,7 @@ class SettingsStore {
 }
 
 @Serializable
-data class HistoryEntry(val item: VideoItem, val watchedAt: Long)
+data class HistoryEntry(val item: VideoItem, val watchedAt: Long, val plays: Int = 1)
 
 private val historySerializer = ListSerializer(HistoryEntry.serializer())
 
@@ -92,11 +96,15 @@ class HistoryStore {
     )
         private set
 
+    /** Every start of a song counts as one play (also each repeat-song loop). */
     fun add(item: VideoItem) {
-        entries = (listOf(HistoryEntry(item, System.currentTimeMillis())) + entries.filter { it.item.url != item.url })
-            .take(1000)
+        val old = entries.firstOrNull { it.item.url == item.url }
+        val entry = HistoryEntry(item, System.currentTimeMillis(), (old?.plays ?: 0) + 1)
+        entries = (listOf(entry) + entries.filter { it.item.url != item.url }).take(1000)
         save()
     }
+
+    fun playsOf(url: String): Int = entries.firstOrNull { it.item.url == url }?.plays ?: 0
 
     fun remove(url: String) {
         entries = entries.filter { it.item.url != url }

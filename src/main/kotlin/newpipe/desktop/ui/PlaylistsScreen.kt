@@ -53,7 +53,6 @@ fun PlaylistsScreen(
 private fun playlistMenu(p: Playlist, actions: VideoActions): List<ContextMenuItem> = listOf(
     ContextMenuItem("Play") { actions.playAll(p.items) },
     ContextMenuItem("Shuffle") { actions.shuffle(p.items) },
-    ContextMenuItem("Play in background (audio only)") { actions.backgroundAll(p.items) },
     ContextMenuItem("Add all to queue") { p.items.forEach { actions.enqueue(it) } },
     ContextMenuItem("Rename…") { actions.renamePlaylist(p.id, p.name) },
     ContextMenuItem("Delete…") { actions.deletePlaylist(p.id, p.name) },
@@ -97,7 +96,6 @@ private fun OverviewList(store: PlaylistStore, actions: VideoActions, onOpen: (S
                             val has = p.items.isNotEmpty()
                             GlossButton("Play", { actions.playAll(p.items) }, enabled = has, brush = Gloss.blue, textColor = Color.White, bold = true)
                             GlossButton("Shuffle", { actions.shuffle(p.items) }, enabled = has)
-                            GlossButton("Background", { actions.backgroundAll(p.items) }, enabled = has)
                         }
                     }
                 }
@@ -124,7 +122,6 @@ private fun PlaylistDetail(p: Playlist, store: PlaylistStore, actions: VideoActi
             GlossButton("◀ All playlists", onBack)
             GlossButton("Play", { actions.playAll(p.items) }, enabled = has, brush = Gloss.blue, textColor = Color.White, bold = true)
             GlossButton("Shuffle", { actions.shuffle(p.items) }, enabled = has)
-            GlossButton("Background", { actions.backgroundAll(p.items) }, enabled = has)
             GlossButton("Rename", { actions.renamePlaylist(p.id, p.name) })
             GlossButton("Delete", { actions.deletePlaylist(p.id, p.name) })
         }

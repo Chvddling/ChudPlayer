@@ -65,7 +65,14 @@ sourceSets {
 compose.desktop {
     application {
         mainClass = "newpipe.desktop.MainKt"
-        jvmArgs += listOf("-Dfile.encoding=UTF-8", "-Djna.encoding=UTF-8")
+        jvmArgs += listOf(
+            "-Dfile.encoding=UTF-8", "-Djna.encoding=UTF-8",
+            // Keep the Java heap small and hand unused memory back to Windows while idle
+            "-Xms64m", "-Xmx768m", "-Xss512k",
+            "-XX:+UseG1GC", "-XX:G1PeriodicGCInterval=15000",
+            "-XX:MinHeapFreeRatio=10", "-XX:MaxHeapFreeRatio=25",
+            "-XX:+UseStringDeduplication", "-XX:ReservedCodeCacheSize=96m",
+        )
 
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)

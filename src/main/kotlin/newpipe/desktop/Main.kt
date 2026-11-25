@@ -20,7 +20,6 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import androidx.compose.ui.window.Tray
@@ -31,7 +30,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import newpipe.desktop.data.HistoryStore
 import newpipe.desktop.data.NewPipeSetup
-import newpipe.desktop.data.PlayMode
 import newpipe.desktop.data.PlaylistStore
 import newpipe.desktop.data.Service
 import newpipe.desktop.data.SettingsStore
@@ -39,7 +37,6 @@ import newpipe.desktop.data.SubsonicClient
 import newpipe.desktop.data.YouTubeRepo
 import newpipe.desktop.player.MpvLib
 import newpipe.desktop.player.PlayerController
-import newpipe.desktop.player.VideoHost
 import newpipe.desktop.ui.Aero
 import newpipe.desktop.ui.AppTheme
 import newpipe.desktop.ui.Gloss
@@ -57,7 +54,6 @@ import newpipe.desktop.ui.SourceList
 import newpipe.desktop.ui.StatusBar
 import newpipe.desktop.ui.TopBar
 import newpipe.desktop.ui.VideoActions
-import newpipe.desktop.ui.VideoLayer
 import newpipe.desktop.ui.serviceName
 import newpipe.desktop.data.SearchKind
 import newpipe.desktop.ui.ChannelScreen
@@ -154,7 +150,7 @@ fun main() {
 
     application {
         val app = remember { AppState() }
-        val player = remember { PlayerController(repo, history, settings, VideoHost()) }
+        val player = remember { PlayerController(repo, history, settings) }
         val search = remember { SearchState(repo, CoroutineScope(SupervisorJob() + Dispatchers.Main)) }
         val bgScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main) }
         val local = remember { LocalState(settings, bgScope) }
@@ -189,8 +185,13 @@ fun main() {
         }
 
         fun toTray() {
-            if (player.fullscreen) player.changeFullscreen(false)
             windowVisible = false
+            // Hidden in the tray: drop cached pictures and give the memory back to Windows
+            bgScope.launch {
+                kotlinx.coroutines.delay(1500)
+                newpipe.desktop.ui.ImageCache.clear()
+                System.gc()
+            }
         }
 
         fun fromTray() {
@@ -229,18 +230,6 @@ fun main() {
                 Item("Exit ChudPlayer", onClick = { quit() })
             },
         )
-        var placementBeforeFullscreen by remember { mutableStateOf(WindowPlacement.Floating) }
-
-        LaunchedEffect(player.fullscreen) {
-            if (player.fullscreen) {
-                if (mainWindow.placement != WindowPlacement.Fullscreen) placementBeforeFullscreen = mainWindow.placement
-                mainWindow.placement = WindowPlacement.Fullscreen
-                app.go(Nav(Screen.Player))
-            } else if (mainWindow.placement == WindowPlacement.Fullscreen) {
-                mainWindow.placement = placementBeforeFullscreen
-            }
-        }
-
         fun submitSearch() {
             val q = search.query.trim()
             if (q.isEmpty()) return
@@ -256,7 +245,6 @@ fun main() {
         }
 
         fun openMiniPlayer() {
-            if (player.fullscreen) player.changeFullscreen(false)
             app.miniPlayerOpen = true
             mainWindow.isMinimized = true
         }
@@ -274,9 +262,7 @@ fun main() {
         ) {
             AppTheme {
                 Box(Modifier.fillMaxSize().background(Aero.bgDeep)) {
-                    if (player.fullscreen) {
-                        PlayerScreen(player, actions)
-                    } else GlassWindowFrame(
+                    GlassWindowFrame(
                         title = player.current?.let { "${it.title} – ChudPlayer" } ?: "ChudPlayer",
                         maximizer = maximizer,
                         onMinimize = { mainWindow.isMinimized = true },
@@ -314,7 +300,7 @@ fun main() {
                                         } else SearchScreen(search, actions)
                                         Screen.Player -> PlayerScreen(player, actions)
                                         Screen.Playlists -> PlaylistsScreen(playlists, actions, app.openPlaylistId) { app.go(Nav(Screen.Playlists, playlistId = it)) }
-                                        Screen.History -> HistoryScreen(history, actions)
+                                        Screen.History -> HistoryScreen(history, actions, settings)
                                         Screen.Channel -> app.nav.channel?.let { ch ->
                                             ChannelScreen(ch, actions, onBack = if (app.canGoBack) ({ app.goBack() }) else null)
                                         }
@@ -343,8 +329,6 @@ fun main() {
                             )
                         }
                     }
-                    // Must stay last and always composed: hosts mpv's native video window.
-                    VideoLayer(player.video)
                 }
 
                 if (app.settingsOpen) {
@@ -387,14 +371,12 @@ fun main() {
     }
 }
 
-/** Keys that reach the window (i.e. not typed into the search box and not eaten by the video). */
+/** Keys that reach the window (i.e. not typed into a text box). */
 private fun handleShortcut(e: KeyEvent, player: PlayerController): Boolean {
     if (e.type != KeyEventType.KeyDown) return false
     // While typing in a text box, Space and arrows belong to the text box.
     if (InputFocus.typing && (e.key == Key.Spacebar || e.key == Key.DirectionLeft || e.key == Key.DirectionRight)) return false
     return when (e.key) {
-        Key.F11 -> { if (player.mode == PlayMode.VIDEO && player.hasVideo) player.changeFullscreen(!player.fullscreen); true }
-        Key.Escape -> if (player.fullscreen) { player.changeFullscreen(false); true } else false
         Key.Spacebar, Key.MediaPlayPause -> { player.togglePause(); true }
         Key.MediaNext -> { player.next(); true }
         Key.MediaPrevious -> { player.previous(); true }
