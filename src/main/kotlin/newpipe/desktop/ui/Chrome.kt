@@ -151,20 +151,28 @@ fun LcdDisplay(player: PlayerController, modifier: Modifier = Modifier) {
 // ---------------- service bar ----------------
 
 @Composable
-fun ServiceBar(serviceId: Int, onService: (Int) -> Unit, info: String) {
+fun ServiceBar(
+    serviceId: Int,
+    onService: (Int) -> Unit,
+    info: String,
+    kindLabels: List<String>? = null,
+    kind: Int = 0,
+    onKind: (Int) -> Unit = {},
+) {
     Row(
         Modifier.fillMaxWidth().height(36.dp).background(Gloss.serviceBar).edgeLine().padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         PillGroup(listOf("YouTube", "SoundCloud"), serviceId, onService, selectedBrush = { serviceBrush(it) })
+        if (kindLabels != null) PillGroup(kindLabels, kind, onKind)
         Text(info, color = Aero.textDim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
 // ---------------- source list (sidebar) ----------------
 
-enum class Screen { Search, Player, Playlists, History }
+enum class Screen { Search, Player, Playlists, History, Channel, RemotePlaylist }
 
 @Composable
 fun SourceList(

@@ -52,7 +52,7 @@ sealed interface PlaylistDialog {
     /** Pick a playlist to add these videos to. */
     data class AddTo(val items: List<VideoItem>) : PlaylistDialog
     /** Name a new playlist, optionally already filled with videos. */
-    data class Create(val items: List<VideoItem> = emptyList()) : PlaylistDialog
+    data class Create(val items: List<VideoItem> = emptyList(), val name: String = "") : PlaylistDialog
     data class Rename(val id: String, val current: String) : PlaylistDialog
     data class Delete(val id: String, val name: String) : PlaylistDialog
 }
@@ -76,7 +76,7 @@ fun PlaylistDialogHost(
         }
         is PlaylistDialog.Create -> DialogFrame("New playlist", DpSize(420.dp, 220.dp), onDismiss) {
             NameContent(
-                initial = "",
+                initial = dialog.name,
                 hint = if (dialog.items.isEmpty()) "Playlist name" else "Playlist name (${dialog.items.size} videos)",
                 confirmLabel = "Create",
                 onCancel = onDismiss,

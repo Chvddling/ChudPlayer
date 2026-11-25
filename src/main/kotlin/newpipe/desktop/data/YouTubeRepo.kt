@@ -7,7 +7,13 @@ import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.Page
 import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.StreamingService
+import org.schabi.newpipe.extractor.channel.ChannelInfo
+import org.schabi.newpipe.extractor.channel.ChannelInfoItem
+import org.schabi.newpipe.extractor.channel.tabs.ChannelTabInfo
+import org.schabi.newpipe.extractor.linkhandler.ListLinkHandler
 import org.schabi.newpipe.extractor.linkhandler.SearchQueryHandler
+import org.schabi.newpipe.extractor.playlist.PlaylistInfo
+import org.schabi.newpipe.extractor.playlist.PlaylistInfoItem
 import org.schabi.newpipe.extractor.localization.ContentCountry
 import org.schabi.newpipe.extractor.localization.Localization
 import org.schabi.newpipe.extractor.search.SearchInfo
@@ -29,11 +35,27 @@ object NewPipeSetup {
     }
 }
 
-class SearchPage(
-    val handler: SearchQueryHandler,
-    val items: List<VideoItem>,
-    val next: Page?,
-    val service: Service = Service.YOUTUBE,
+/** One page of a list (search results, a channel tab, a playlist). [more] fetches the next page. */
+class ListPage(
+    val items: List<SearchItem>,
+    private val next: Page?,
+    private val loader: ((Page) -> ListPage)?,
+) {
+    val hasMore: Boolean get() = next != null && loader != null
+
+    /** Blocking: call on Dispatchers.IO. */
+    fun more(): ListPage {
+        val p = next ?: return ListPage(emptyList(), null, null)
+        return loader?.invoke(p) ?: ListPage(emptyList(), null, null)
+    }
+}
+
+/** A channel / artist page: its info plus the tabs we show. */
+class ChannelDetails(
+    val ref: ChannelRef,
+    val banner: String?,
+    val videosTab: ListLinkHandler?,
+    val playlistsTab: ListLinkHandler?,
 )
 
 class NoStreamsException(msg: String) : Exception(msg)
@@ -55,19 +77,87 @@ class YouTubeRepo {
 
     fun isVideoUrl(text: String): Boolean = serviceOfUrl(text) != null
 
-    fun search(query: String, service: Service = Service.YOUTUBE): SearchPage {
-        val s = np(service)
-        // YoutubeSearchQueryHandlerFactory.VIDEOS / SoundcloudSearchQueryHandlerFactory.TRACKS
-        val filter = if (service == Service.SOUNDCLOUD) "tracks" else "videos"
-        val handler = s.searchQHFactory.fromQuery(query, listOf(filter), "")
-        val info = SearchInfo.getInfo(s, handler)
-        return SearchPage(handler, info.relatedItems.toVideoItems(), info.nextPage.validOrNull(), service)
+    /** NewPipe search filter names per service and kind. */
+    private fun filterFor(service: Service, kind: SearchKind): String = when (service) {
+        Service.YOUTUBE -> when (kind) {
+            SearchKind.ITEMS -> "videos"
+            SearchKind.CHANNELS -> "channels"
+            SearchKind.PLAYLISTS -> "playlists"
+        }
+        Service.SOUNDCLOUD -> when (kind) {
+            SearchKind.ITEMS -> "tracks"
+            SearchKind.CHANNELS -> "users"
+            SearchKind.PLAYLISTS -> "playlists"
+        }
     }
 
-    fun searchMore(previous: SearchPage): SearchPage {
-        val page = previous.next ?: return SearchPage(previous.handler, emptyList(), null, previous.service)
-        val res = SearchInfo.getMoreItems(np(previous.service), previous.handler, page)
-        return SearchPage(previous.handler, res.items.toVideoItems(), res.nextPage.validOrNull(), previous.service)
+    fun search(query: String, service: Service = Service.YOUTUBE, kind: SearchKind = SearchKind.ITEMS): ListPage {
+        val s = np(service)
+        val handler = s.searchQHFactory.fromQuery(query, listOf(filterFor(service, kind)), "")
+        val info = SearchInfo.getInfo(s, handler)
+        return ListPage(info.relatedItems.toSearchItems(), info.nextPage.validOrNull()) { p -> searchPage(s, handler, p) }
+    }
+
+    private fun searchPage(s: StreamingService, handler: SearchQueryHandler, page: Page): ListPage {
+        val res = SearchInfo.getMoreItems(s, handler, page)
+        return ListPage(res.items.toSearchItems(), res.nextPage.validOrNull()) { p -> searchPage(s, handler, p) }
+    }
+
+    // ---------------- channels / artists ----------------
+
+    fun channel(url: String): ChannelDetails {
+        val s = NewPipe.getServiceByUrl(url)
+        val info = ChannelInfo.getInfo(s, url)
+        fun tab(vararg names: String) = info.tabs.firstOrNull { t -> t.contentFilters.any { it in names } }
+        val ref = ChannelRef(
+            url = info.url,
+            name = info.name,
+            avatar = bestThumbnail(info.avatars, target = 176),
+            subscribers = info.subscriberCount,
+            description = info.description.orEmpty(),
+            serviceId = info.serviceId,
+        )
+        return ChannelDetails(
+            ref = ref,
+            banner = bestThumbnail(info.banners, target = 400),
+            // ChannelTabs.VIDEOS / TRACKS, and PLAYLISTS / ALBUMS
+            videosTab = tab("videos", "tracks"),
+            playlistsTab = tab("playlists", "albums"),
+        )
+    }
+
+    fun channelTab(serviceId: Int, tab: ListLinkHandler): ListPage {
+        val s = NewPipe.getService(serviceId)
+        val info = ChannelTabInfo.getInfo(s, tab)
+        return ListPage(info.relatedItems.toSearchItems(), info.nextPage.validOrNull()) { p -> channelTabPage(s, tab, p) }
+    }
+
+    private fun channelTabPage(s: StreamingService, tab: ListLinkHandler, page: Page): ListPage {
+        val res = ChannelTabInfo.getMoreItems(s, tab, page)
+        return ListPage(res.items.toSearchItems(), res.nextPage.validOrNull()) { p -> channelTabPage(s, tab, p) }
+    }
+
+    // ---------------- online playlists ----------------
+
+    fun playlist(url: String): Pair<PlaylistRef, ListPage> {
+        val s = NewPipe.getServiceByUrl(url)
+        val info = PlaylistInfo.getInfo(s, url)
+        val ref = PlaylistRef(
+            url = info.url,
+            name = info.name,
+            uploader = info.uploaderName.orEmpty(),
+            uploaderUrl = info.uploaderUrl,
+            thumbnail = bestThumbnail(info.thumbnails, target = 360),
+            count = info.streamCount,
+            serviceId = info.serviceId,
+        )
+        val first = ListPage(info.relatedItems.toSearchItems(), info.nextPage.validOrNull()) { p -> playlistPage(s, info.url, p) }
+        return ref to first
+    }
+
+    private fun playlistPage(s: StreamingService, url: String, page: Page): ListPage {
+        val res = PlaylistInfo.getMoreItems(s, url, page)
+        return ListPage(res.items.toSearchItems(), res.nextPage.validOrNull()) { p -> playlistPage(s, url, p) }
     }
 
     fun streamDetails(url: String): StreamDetails {
@@ -195,6 +285,31 @@ class YouTubeRepo {
 
     private fun List<InfoItem>.toVideoItems(): List<VideoItem> =
         filterIsInstance<StreamInfoItem>().map { it.toVideoItem() }
+
+    private fun List<InfoItem>.toSearchItems(): List<SearchItem> = mapNotNull { it ->
+        when (it) {
+            is StreamInfoItem -> VideoResult(it.toVideoItem())
+            is ChannelInfoItem -> ChannelRef(
+                url = it.url,
+                name = it.name,
+                avatar = bestThumbnail(it.thumbnails, target = 176),
+                subscribers = it.subscriberCount,
+                streamCount = it.streamCount,
+                description = it.description.orEmpty(),
+                serviceId = it.serviceId,
+            )
+            is PlaylistInfoItem -> PlaylistRef(
+                url = it.url,
+                name = it.name,
+                uploader = it.uploaderName.orEmpty(),
+                uploaderUrl = it.uploaderUrl,
+                thumbnail = bestThumbnail(it.thumbnails, target = 360),
+                count = it.streamCount,
+                serviceId = it.serviceId,
+            )
+            else -> null
+        }
+    }
 
     private fun StreamType.isLive() = this == StreamType.LIVE_STREAM || this == StreamType.AUDIO_LIVE_STREAM
 

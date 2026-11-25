@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -304,6 +305,11 @@ fun PillGroup(
     }
 }
 
+/** True while a text box has keyboard focus, so Space/arrows type instead of controlling playback. */
+object InputFocus {
+    @Volatile var typing: Boolean = false
+}
+
 @Composable
 fun GlassSearchField(
     value: String,
@@ -330,6 +336,7 @@ fun GlassSearchField(
                 modifier = Modifier
                     .fillMaxWidth()
                     .semantics { contentDescription = "Search" }
+                    .onFocusChanged { InputFocus.typing = it.isFocused }
                     .onPreviewKeyEvent {
                         if (it.type == KeyEventType.KeyDown && (it.key == Key.Enter || it.key == Key.NumPadEnter)) {
                             onSubmit(); true

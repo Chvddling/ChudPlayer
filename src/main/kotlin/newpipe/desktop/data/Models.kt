@@ -54,3 +54,36 @@ data class PlaybackSource(
     /** false for audio-only content (SoundCloud) or audio mode. */
     val hasVideo: Boolean = true,
 )
+
+/** What a search (or a channel/playlist page) can return. */
+sealed interface SearchItem {
+    val url: String
+}
+
+data class VideoResult(val item: VideoItem) : SearchItem {
+    override val url: String get() = item.url
+}
+
+/** A YouTube channel or a SoundCloud artist. */
+data class ChannelRef(
+    override val url: String,
+    val name: String,
+    val avatar: String?,
+    val subscribers: Long = -1,
+    val streamCount: Long = -1,
+    val description: String = "",
+    val serviceId: Int = 0,
+) : SearchItem
+
+/** A playlist on YouTube/SoundCloud (not one of the user's local playlists). */
+data class PlaylistRef(
+    override val url: String,
+    val name: String,
+    val uploader: String = "",
+    val uploaderUrl: String? = null,
+    val thumbnail: String? = null,
+    val count: Long = -1,
+    val serviceId: Int = 0,
+) : SearchItem
+
+enum class SearchKind { ITEMS, CHANNELS, PLAYLISTS }

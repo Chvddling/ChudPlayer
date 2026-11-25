@@ -97,7 +97,21 @@ object YtDlp {
     /** Backup search through yt-dlp ("ytsearch30:…" / "scsearch30:…"). Blocking: call on Dispatchers.IO. */
     fun search(query: String, service: Service, limit: Int = 30): List<VideoItem> {
         val prefix = if (service == Service.SOUNDCLOUD) "scsearch$limit:" else "ytsearch$limit:"
-        val out = run(listOf("--flat-playlist", "-J", "--no-warnings", "--encoding", "utf-8", prefix + query), timeoutSec = 90)
+        return list(prefix + query, service, limit)
+    }
+
+    /** Search inside one YouTube channel (yt-dlp understands <channel>/search?query=…). */
+    fun searchChannel(channelUrl: String, query: String, limit: Int = 60): List<VideoItem> {
+        val q = java.net.URLEncoder.encode(query, Charsets.UTF_8)
+        return list(channelUrl.trimEnd('/') + "/search?query=" + q, Service.YOUTUBE, limit)
+    }
+
+    /** Lists the entries of a search/channel/playlist URL without resolving each video. */
+    private fun list(target: String, service: Service, limit: Int): List<VideoItem> {
+        val out = run(
+            listOf("--flat-playlist", "-J", "--no-warnings", "--encoding", "utf-8", "--playlist-end", limit.toString(), target),
+            timeoutSec = 120,
+        )
         val root = json.parseToJsonElement(out).jsonObject
         val entries = root["entries"]?.jsonArray ?: return emptyList()
         return entries.mapNotNull { el ->

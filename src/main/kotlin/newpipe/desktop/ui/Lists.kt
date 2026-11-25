@@ -36,7 +36,24 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.LaunchedEffect
+import newpipe.desktop.data.ChannelRef
+import newpipe.desktop.data.PlaylistRef
 import newpipe.desktop.data.PlaylistStore
+import newpipe.desktop.data.SearchItem
+import newpipe.desktop.data.VideoResult
 import newpipe.desktop.data.VideoItem
 import newpipe.desktop.player.PlayerController
 
@@ -48,8 +65,13 @@ class VideoActions(
     val playlists: PlaylistStore,
     private val showDialog: (PlaylistDialog) -> Unit,
     private val openPlayer: () -> Unit,
+    private val openChannelPage: (String) -> Unit,
+    private val openPlaylistPage: (String) -> Unit,
 ) {
-    fun play(item: VideoItem) { player.play(item); openPlayer() }
+    /** A click on a song: add it to the queue and play it now (the rest of the queue stays). */
+    fun play(item: VideoItem) { player.addAndPlay(item); openPlayer() }
+    fun openChannel(url: String?) { if (!url.isNullOrBlank()) openChannelPage(url) }
+    fun openPlaylist(url: String) = openPlaylistPage(url)
     fun playAll(items: List<VideoItem>, start: Int = 0) { player.playCollection(items, start); openPlayer() }
     fun shuffle(items: List<VideoItem>) { player.playCollection(items, shuffle = true); openPlayer() }
     fun background(item: VideoItem) = player.playInBackground(item)
@@ -57,7 +79,7 @@ class VideoActions(
     fun playNext(item: VideoItem) = player.playNext(item)
     fun enqueue(item: VideoItem) = player.enqueue(item)
     fun addToPlaylist(items: List<VideoItem>) { if (items.isNotEmpty()) showDialog(PlaylistDialog.AddTo(items)) }
-    fun newPlaylist(items: List<VideoItem> = emptyList()) = showDialog(PlaylistDialog.Create(items))
+    fun newPlaylist(items: List<VideoItem> = emptyList(), name: String = "") = showDialog(PlaylistDialog.Create(items, name))
     fun saveQueueAsPlaylist() { if (player.queue.isNotEmpty()) showDialog(PlaylistDialog.Create(player.queue)) }
     fun renamePlaylist(id: String, name: String) = showDialog(PlaylistDialog.Rename(id, name))
     fun deletePlaylist(id: String, name: String) = showDialog(PlaylistDialog.Delete(id, name))
@@ -71,6 +93,9 @@ class VideoActions(
             ContextMenuItem("Play in background (audio only)") { background(item) },
             ContextMenuItem("Add to playlist…") { addToPlaylist(listOf(item)) },
         )
+        if (!item.uploaderUrl.isNullOrBlank()) {
+            menu += ContextMenuItem("Go to channel${if (item.uploader.isNotBlank()) ": " + item.uploader else ""}") { openChannel(item.uploaderUrl) }
+        }
         // Quick "add to" entries for the first few playlists that don't have it yet
         playlists.playlists
             .filter { p -> p.items.none { it.url == item.url } }
@@ -154,10 +179,9 @@ fun TrackRow(
                 color = color, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
             )
-            Text(
-                item.uploader, Modifier.weight(2f).padding(end = 10.dp),
-                color = if (selected) Color.White else Aero.textDim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
+            Box(Modifier.weight(2f).padding(end = 10.dp)) {
+                ChannelLink(item, actions, if (selected) Color.White else Aero.textDim)
+            }
             Text(item.lengthText(), Modifier.width(colTime), color = if (selected) Color.White else Aero.textDim, fontSize = 12.sp)
             Box(Modifier.width(colSource)) { ServiceBadge(item.serviceId) }
             trailing?.invoke(this)
@@ -209,7 +233,12 @@ fun TrackCard(item: VideoItem, actions: VideoActions) {
                 item.title, color = Aero.textBright, fontWeight = FontWeight.Bold, fontSize = 12.sp,
                 maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
-            Text(item.subtitle(), color = Aero.textDim, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            ChannelLink(item, actions, Aero.textDim, fontSize = 11)
+            val stats = listOfNotNull(
+                formatCount(item.viewCount).takeIf { it.isNotEmpty() }?.let { if (item.serviceId == 1) "$it plays" else "$it views" },
+                item.uploadDate?.takeIf { it.isNotBlank() },
+            ).joinToString(" · ")
+            if (stats.isNotEmpty()) Text(stats, color = Aero.label, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(Modifier.padding(top = 5.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)) {
                 GlossButton("Play", { actions.play(item) }, brush = serviceBrush(item.serviceId), textColor = Color.White, bold = true, height = 22.dp)
                 GlossButton("+ Queue", { actions.enqueue(item) }, height = 22.dp)
@@ -234,4 +263,127 @@ fun RowIcon(symbol: String, label: String, enabled: Boolean = true, onClick: () 
             .padding(vertical = 4.dp),
         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
     )
+}
+
+
+/** The uploader's name; clicking it opens their channel / artist page. */
+@Composable
+fun ChannelLink(item: VideoItem, actions: VideoActions, color: Color, fontSize: Int = 12) {
+    val canOpen = !item.uploaderUrl.isNullOrBlank()
+    Text(
+        item.uploader,
+        color = color,
+        fontSize = fontSize.sp,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = if (canOpen) Modifier.clickable(onClickLabel = "Open channel") { actions.openChannel(item.uploaderUrl) } else Modifier,
+    )
+}
+
+// ---------------- channel & online playlist cards ----------------
+
+@Composable
+fun ChannelCard(ch: ChannelRef, actions: VideoActions) {
+    ContextMenuArea(items = { listOf(ContextMenuItem("Open ${ch.name}") { actions.openChannel(ch.url) }) }) {
+        Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).clickable { actions.openChannel(ch.url) }.padding(vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(Modifier.size(120.dp).clip(CircleShape).border(1.dp, Color.Black, CircleShape)) {
+                NetImage(ch.avatar, Modifier.fillMaxSize())
+                Box(Modifier.fillMaxWidth().height(60.dp).background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.28f), Color.Transparent))))
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(ch.name, color = Aero.textBright, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val stats = listOfNotNull(
+                formatCount(ch.subscribers).takeIf { it.isNotEmpty() }?.let { if (ch.serviceId == 1) "$it followers" else "$it subscribers" },
+                formatCount(ch.streamCount).takeIf { it.isNotEmpty() }?.let { if (ch.serviceId == 1) "$it tracks" else "$it videos" },
+            ).joinToString(" · ")
+            if (stats.isNotEmpty()) Text(stats, color = Aero.textDim, fontSize = 11.sp, maxLines = 1)
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ServiceBadge(ch.serviceId)
+                GlossButton("Open", { actions.openChannel(ch.url) }, brush = Gloss.blue, textColor = Color.White, bold = true, height = 22.dp)
+            }
+        }
+    }
+}
+
+@Composable
+fun PlaylistCard(pl: PlaylistRef, actions: VideoActions) {
+    ContextMenuArea(items = {
+        listOfNotNull(
+            ContextMenuItem("Open playlist") { actions.openPlaylist(pl.url) },
+            pl.uploaderUrl?.takeIf { it.isNotBlank() }?.let { ContextMenuItem("Go to channel: ${pl.uploader}") { actions.openChannel(it) } },
+        )
+    }) {
+        Column(Modifier.fillMaxWidth().clickable { actions.openPlaylist(pl.url) }) {
+            val shape = RoundedCornerShape(4.dp)
+            Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(shape).border(1.dp, Color.Black, shape)) {
+                NetImage(pl.thumbnail, Modifier.fillMaxSize())
+                Box(Modifier.fillMaxWidth().fillMaxHeight(0.5f).background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.30f), Color.White.copy(alpha = 0.03f)))))
+                // stacked "playlist" strip on the right
+                Column(
+                    Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(70.dp).background(Color(0xCC0D1117)),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text(if (pl.count >= 0) "${pl.count}" else "?", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("≡ items", color = Aero.textDim, fontSize = 10.sp)
+                }
+                Box(Modifier.align(Alignment.TopStart).padding(6.dp)) { ServiceBadge(pl.serviceId) }
+            }
+            Spacer(Modifier.height(16.dp))
+            Text(pl.name, color = Aero.textBright, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (pl.uploader.isNotBlank()) {
+                Text(
+                    pl.uploader, color = Aero.textDim, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = if (!pl.uploaderUrl.isNullOrBlank()) Modifier.clickable { actions.openChannel(pl.uploaderUrl) } else Modifier,
+                )
+            }
+            Row(Modifier.padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                GlossButton("Open", { actions.openPlaylist(pl.url) }, brush = Gloss.blue, textColor = Color.White, bold = true, height = 22.dp)
+            }
+        }
+    }
+}
+
+/** Grid of mixed results (videos, channels, playlists) with infinite scroll. */
+@Composable
+fun ResultGrid(
+    results: List<SearchItem>,
+    actions: VideoActions,
+    hasMore: Boolean,
+    loading: Boolean,
+    onLoadMore: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val grid = rememberLazyGridState()
+    Box(modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(220.dp),
+            state = grid,
+            contentPadding = PaddingValues(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(18.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            items(results, key = { it.url }) { r ->
+                when (r) {
+                    is VideoResult -> TrackCard(r.item, actions)
+                    is ChannelRef -> ChannelCard(r, actions)
+                    is PlaylistRef -> PlaylistCard(r, actions)
+                }
+            }
+            if (hasMore || loading) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    if (hasMore) LaunchedEffect(results.size) { onLoadMore() }
+                    Box(Modifier.fillMaxWidth().padding(16.dp), Alignment.Center) {
+                        if (loading) CircularProgressIndicator(Modifier.size(28.dp)) else Text("Loading more…", color = Aero.textDim)
+                    }
+                }
+            }
+        }
+        VerticalScrollbar(rememberScrollbarAdapter(grid), Modifier.align(Alignment.CenterEnd).fillMaxHeight())
+    }
 }

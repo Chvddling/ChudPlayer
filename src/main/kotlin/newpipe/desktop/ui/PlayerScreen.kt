@@ -149,7 +149,15 @@ private fun InfoStrip(player: PlayerController, actions: VideoActions) {
         Column(Modifier.weight(1f)) {
             Text(item.title, color = Aero.textBright, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val likes = d?.likeCount?.let { formatCount(it) }?.takeIf { it.isNotEmpty() }?.let { "$it likes" }
-            Text(listOfNotNull(item.subtitle().ifEmpty { null }, likes).joinToString(" · "), color = Aero.textDim, fontSize = 11.sp, maxLines = 1)
+            val stats = listOfNotNull(
+                formatCount(item.viewCount).takeIf { it.isNotEmpty() }?.let { if (item.serviceId == 1) "$it plays" else "$it views" },
+                item.uploadDate?.takeIf { it.isNotBlank() },
+                likes,
+            ).joinToString(" · ")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ChannelLink(item, actions, Aero.link, fontSize = 11)
+                if (stats.isNotEmpty()) Text("  ·  $stats", color = Aero.textDim, fontSize = 11.sp, maxLines = 1)
+            }
         }
         if (player.hasVideo || player.mode == PlayMode.AUDIO) {
             PillGroup(listOf("Video", "Audio"), if (player.mode == PlayMode.VIDEO) 0 else 1, {

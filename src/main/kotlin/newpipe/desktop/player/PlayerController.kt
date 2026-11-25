@@ -100,10 +100,23 @@ class PlayerController(
     /** Total length of the queue in seconds (unknown lengths count as 0). */
     val queueSeconds: Long get() = queue.sumOf { it.durationSec.coerceAtLeast(0) }
 
+    /**
+     * What a click on a song does: add it to the end of the queue and play it now.
+     * The rest of the queue stays; if it's already queued, jump to it.
+     */
+    fun addAndPlay(item: VideoItem) {
+        if (queue.isEmpty()) { play(item); return }
+        val existing = queue.indexOfFirst { it.url == item.url }
+        if (existing >= 0) { jumpTo(existing); return }
+        queue = queue + item
+        index = queue.lastIndex
+        loadCurrent()
+    }
+
     /** "Play in background": audio only. */
     fun playInBackground(item: VideoItem) {
         if (mode != PlayMode.AUDIO) { mode = PlayMode.AUDIO; settings.update { it.copy(mode = mode.name) } }
-        play(item)
+        addAndPlay(item)
     }
 
     /** Play a whole playlist: in order, shuffled, and/or audio only. */

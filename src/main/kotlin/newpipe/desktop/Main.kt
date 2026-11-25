@@ -55,15 +55,47 @@ import newpipe.desktop.ui.TopBar
 import newpipe.desktop.ui.VideoActions
 import newpipe.desktop.ui.VideoLayer
 import newpipe.desktop.ui.serviceName
+import newpipe.desktop.data.SearchKind
+import newpipe.desktop.ui.ChannelScreen
+import newpipe.desktop.ui.ChannelState
+import newpipe.desktop.ui.InputFocus
+import newpipe.desktop.ui.RemotePlaylistScreen
+import newpipe.desktop.ui.RemotePlaylistState
 import newpipe.desktop.update.Updater
 import newpipe.desktop.update.YtDlp
 import kotlinx.coroutines.launch
 
+/** One place in the app (a screen plus what it shows). */
+class Nav(
+    val screen: Screen,
+    val playlistId: String? = null,
+    val channel: ChannelState? = null,
+    val remote: RemotePlaylistState? = null,
+)
+
 class AppState {
-    var screen by mutableStateOf(Screen.Search)
+    var nav by mutableStateOf(Nav(Screen.Search)); private set
+    var canGoBack by mutableStateOf(false); private set
+    private val back = mutableListOf<Nav>()
+    val screen: Screen get() = nav.screen
+    val openPlaylistId: String? get() = nav.playlistId
     var miniPlayerOpen by mutableStateOf(false)
     var playlistDialog by mutableStateOf<PlaylistDialog?>(null)
-    var openPlaylistId by mutableStateOf<String?>(null)
+
+    fun go(n: Nav) {
+        val same = n.screen == nav.screen && n.playlistId == nav.playlistId && n.channel == null && n.remote == null
+        if (same) return
+        back.add(nav)
+        if (back.size > 30) back.removeAt(0)
+        nav = n
+        canGoBack = true
+    }
+
+    fun goBack() {
+        val prev = back.removeLastOrNull() ?: return
+        nav = prev
+        canGoBack = back.isNotEmpty()
+    }
 }
 
 fun main() {
@@ -82,15 +114,17 @@ fun main() {
         val app = remember { AppState() }
         val player = remember { PlayerController(repo, history, settings, VideoHost()) }
         val search = remember { SearchState(repo, CoroutineScope(SupervisorJob() + Dispatchers.Main)) }
+        val bgScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main) }
         val actions = remember {
             VideoActions(
                 player = player,
                 playlists = playlists,
                 showDialog = { app.playlistDialog = it },
-                openPlayer = { app.screen = Screen.Player },
+                openPlayer = { app.go(Nav(Screen.Player)) },
+                openChannelPage = { url -> app.go(Nav(Screen.Channel, channel = ChannelState(url, repo, bgScope))) },
+                openPlaylistPage = { url -> app.go(Nav(Screen.RemotePlaylist, remote = RemotePlaylistState(url, repo, bgScope))) },
             )
         }
-        val bgScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main) }
         val updater = remember { Updater(bgScope) }
         var autoUpdate by remember { mutableStateOf(settings.value.autoUpdate) }
         LaunchedEffect(Unit) {
@@ -105,7 +139,7 @@ fun main() {
             if (player.fullscreen) {
                 if (mainWindow.placement != WindowPlacement.Fullscreen) placementBeforeFullscreen = mainWindow.placement
                 mainWindow.placement = WindowPlacement.Fullscreen
-                app.screen = Screen.Player
+                app.go(Nav(Screen.Player))
             } else if (mainWindow.placement == WindowPlacement.Fullscreen) {
                 mainWindow.placement = placementBeforeFullscreen
             }
@@ -116,9 +150,9 @@ fun main() {
             if (q.isEmpty()) return
             if (repo.isVideoUrl(q)) {
                 player.playUrl(q)
-                app.screen = Screen.Player
+                app.go(Nav(Screen.Player))
             } else {
-                app.screen = Screen.Search
+                app.go(Nav(Screen.Search))
                 search.search(q)
             }
         }
@@ -150,19 +184,34 @@ fun main() {
                                 Screen.Player -> player.current?.let { "Playing from ${serviceName(it.serviceId)}" + (if (player.sourceLabel.isNotEmpty()) " · ${player.sourceLabel}" else "") } ?: ""
                                 Screen.Playlists -> "Right-click a playlist or a song for more options"
                                 Screen.History -> "Right-click a song for more options"
+                                Screen.Channel -> app.nav.channel?.details?.ref?.name?.let { "Channel: $it · right-click anything for more options" } ?: "Loading channel…"
+                                Screen.RemotePlaylist -> app.nav.remote?.ref?.name?.let { "Playlist: $it" } ?: "Loading playlist…"
                             }
-                            ServiceBar(search.service.id, { search.changeService(Service.of(it)) }, info)
+                            val onSearch = app.screen == Screen.Search
+                            ServiceBar(
+                                serviceId = search.service.id,
+                                onService = { search.changeService(Service.of(it)); app.go(Nav(Screen.Search)) },
+                                info = info,
+                                kindLabels = if (onSearch) search.kindLabels() else null,
+                                kind = search.kind.ordinal,
+                                onKind = { search.changeKind(SearchKind.entries[it]) },
+                            )
                             Row(Modifier.weight(1f)) {
                                 SourceList(app.screen, app.openPlaylistId, playlists, player, actions) { screen, playlistId ->
-                                    app.screen = screen
-                                    app.openPlaylistId = playlistId
+                                    app.go(Nav(screen, playlistId = playlistId))
                                 }
                                 Box(Modifier.weight(1f).fillMaxHeight().background(Gloss.content)) {
                                     when (app.screen) {
                                         Screen.Search -> SearchScreen(search, actions)
                                         Screen.Player -> PlayerScreen(player, actions)
-                                        Screen.Playlists -> PlaylistsScreen(playlists, actions, app.openPlaylistId) { app.openPlaylistId = it }
+                                        Screen.Playlists -> PlaylistsScreen(playlists, actions, app.openPlaylistId) { app.go(Nav(Screen.Playlists, playlistId = it)) }
                                         Screen.History -> HistoryScreen(history, actions)
+                                        Screen.Channel -> app.nav.channel?.let { ch ->
+                                            ChannelScreen(ch, actions, onBack = if (app.canGoBack) ({ app.goBack() }) else null)
+                                        }
+                                        Screen.RemotePlaylist -> app.nav.remote?.let { pl ->
+                                            RemotePlaylistScreen(pl, actions, onBack = if (app.canGoBack) ({ app.goBack() }) else null)
+                                        }
                                     }
                                 }
                             }
@@ -194,7 +243,7 @@ fun main() {
                     store = playlists,
                     onDismiss = { app.playlistDialog = null },
                     onSwitch = { app.playlistDialog = it },
-                    onDeleted = { id -> if (app.openPlaylistId == id) app.openPlaylistId = null },
+                    onDeleted = { id -> if (app.openPlaylistId == id) app.go(Nav(Screen.Playlists)) },
                 )
             }
         }
@@ -206,7 +255,7 @@ fun main() {
                 onRestore = {
                     app.miniPlayerOpen = false
                     mainWindow.isMinimized = false
-                    app.screen = Screen.Player
+                    app.go(Nav(Screen.Player))
                 },
             )
         }
@@ -216,6 +265,8 @@ fun main() {
 /** Keys that reach the window (i.e. not typed into the search box and not eaten by the video). */
 private fun handleShortcut(e: KeyEvent, player: PlayerController): Boolean {
     if (e.type != KeyEventType.KeyDown) return false
+    // While typing in a text box, Space and arrows belong to the text box.
+    if (InputFocus.typing && (e.key == Key.Spacebar || e.key == Key.DirectionLeft || e.key == Key.DirectionRight)) return false
     return when (e.key) {
         Key.F11 -> { if (player.mode == PlayMode.VIDEO && player.hasVideo) player.changeFullscreen(!player.fullscreen); true }
         Key.Escape -> if (player.fullscreen) { player.changeFullscreen(false); true } else false
