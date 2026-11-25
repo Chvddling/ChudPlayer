@@ -90,7 +90,7 @@ class LocalState(private val settings: SettingsStore, private val scope: Corouti
             ?: LocalMusic.defaultMusicFolder()
 
     /** Sets the main music folder (from Settings or the "Change…" button). Empty = Windows Music folder. */
-    fun setRoot(dir: File?) {
+    fun changeMusicFolder(dir: File?) {
         settings.update { it.copy(musicFolder = dir?.absolutePath.orEmpty()) }
         root = resolveRoot()
         children.clear()

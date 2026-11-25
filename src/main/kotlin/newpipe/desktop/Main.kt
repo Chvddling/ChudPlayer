@@ -229,7 +229,7 @@ fun main() {
                                 Box(Modifier.weight(1f).fillMaxHeight().background(Gloss.content)) {
                                     when (app.screen) {
                                         Screen.Search -> if (search.service == Service.LOCAL) {
-                                            LocalScreen(local, actions, onChooseFolder = { chooseFolder(local.root)?.let { local.setRoot(it) } })
+                                            LocalScreen(local, actions, onChooseFolder = { chooseFolder(local.root)?.let { local.changeMusicFolder(it) } })
                                         } else SearchScreen(search, actions)
                                         Screen.Player -> PlayerScreen(player, actions)
                                         Screen.Playlists -> PlaylistsScreen(playlists, actions, app.openPlaylistId) { app.go(Nav(Screen.Playlists, playlistId = it)) }

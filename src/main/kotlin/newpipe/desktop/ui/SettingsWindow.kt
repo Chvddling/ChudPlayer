@@ -96,9 +96,9 @@ fun SettingsWindow(
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         GlossButton("Choose folder…", {
-                            chooseFolder(local.root)?.let { local.setRoot(it) }
+                            chooseFolder(local.root)?.let { local.changeMusicFolder(it) }
                         }, brush = Gloss.green, textColor = Color.White, bold = true)
-                        GlossButton("Use Windows “Music” folder", { local.setRoot(null) }, enabled = LocalMusic.defaultMusicFolder() != null)
+                        GlossButton("Use Windows “Music” folder", { local.changeMusicFolder(null) }, enabled = LocalMusic.defaultMusicFolder() != null)
                     }
                 }
 
