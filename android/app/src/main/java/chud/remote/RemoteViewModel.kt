@@ -330,7 +330,7 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
 
     fun openChannel(url: String, name: String = "Channel", tab: String = "videos") {
         if (url.startsWith("folder:")) {
-            tab = Tab.LIBRARY; librarySection = 2; openLocal(url.removePrefix("folder:")); return
+            this.tab = Tab.LIBRARY; librarySection = 2; openLocal(url.removePrefix("folder:")); return
         }
         loadDetail(DetailPage(name, channelUrl = url, channelTab = tab)) { it.channel(url, tab) }
     }
