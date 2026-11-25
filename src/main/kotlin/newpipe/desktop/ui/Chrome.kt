@@ -147,7 +147,7 @@ fun LcdDisplay(player: PlayerController, modifier: Modifier = Modifier) {
                         onValueChangeFinished = { drag?.let { player.seek(it * dur) }; drag = null },
                         enabled = dur > 0 && !item.isLive,
                         trackHeight = 4.dp,
-                        knob = false,
+                        knob = true,
                         modifier = Modifier.weight(1f).padding(horizontal = 6.dp),
                     )
                     Text(if (item.isLive) "LIVE" else "-" + formatTime((dur - pos).coerceAtLeast(0.0)), color = Aero.lcdDim, fontSize = 10.sp)

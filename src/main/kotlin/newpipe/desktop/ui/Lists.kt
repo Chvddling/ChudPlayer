@@ -1,5 +1,7 @@
 package newpipe.desktop.ui
 
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.foundation.ContextMenuArea
 import androidx.compose.foundation.ContextMenuItem
 import androidx.compose.foundation.background
@@ -133,7 +135,7 @@ private fun HeaderCell(text: String, modifier: Modifier) {
 }
 
 @Composable
-fun TrackHeader(trailingWidth: Dp = 0.dp, trailingLabel: String = "") {
+fun TrackHeader(trailingWidth: Dp = 0.dp, trailingLabel: String = "", grip: Boolean = false) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -143,6 +145,7 @@ fun TrackHeader(trailingWidth: Dp = 0.dp, trailingLabel: String = "") {
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (grip) Spacer(Modifier.width(18.dp))
         HeaderCell("#", Modifier.width(colNum))
         HeaderCell("Title", Modifier.weight(3f))
         HeaderCell("Channel / Artist", Modifier.weight(2f))
@@ -165,6 +168,7 @@ fun TrackRow(
     selected: Boolean = false,
     extraMenu: () -> List<ContextMenuItem> = { emptyList() },
     modifier: Modifier = Modifier,
+    grip: Boolean = false,
     trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
     // [modifier] goes on the outermost box so drag & drop can lift the whole row
@@ -179,6 +183,7 @@ fun TrackRow(
                 .padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (grip) DragGrip(if (selected) Color.White.copy(alpha = 0.8f) else Aero.textDim)
             Text(number, Modifier.width(colNum), color = color, fontSize = 12.sp)
             Text(
                 item.title, Modifier.weight(3f).padding(end = 10.dp),
@@ -194,6 +199,24 @@ fun TrackRow(
         }
     }
 }
+}
+
+/** Six dots on the left of a queue row: grab here (or anywhere on the row) to drag it. */
+@Composable
+fun DragGrip(color: Color) {
+    androidx.compose.foundation.Canvas(
+        Modifier
+            .width(18.dp)
+            .height(16.dp)
+            .pointerHoverIcon(PointerIcon(java.awt.Cursor(java.awt.Cursor.MOVE_CURSOR)))
+    ) {
+        val r = 1.6.dp.toPx()
+        for (cx in listOf(size.width * 0.3f, size.width * 0.62f)) {
+            for (cy in listOf(size.height * 0.2f, size.height * 0.5f, size.height * 0.8f)) {
+                drawCircle(color, r, androidx.compose.ui.geometry.Offset(cx, cy))
+            }
+        }
+    }
 }
 
 // ---------------- grid card with reflection ----------------

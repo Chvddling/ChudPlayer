@@ -200,7 +200,7 @@ private fun QueuePanel(player: PlayerController, actions: VideoActions, modifier
         }
         when (tab) {
             0 -> {
-                TrackHeader(trailingWidth = 24.dp)
+                TrackHeader(trailingWidth = 24.dp, grip = true)
                 val state = rememberLazyListState()
                 val reorder = rememberReorderState(state) { from, to -> player.moveInQueue(from, to) }
                 Box(Modifier.fillMaxSize()) {
@@ -209,6 +209,7 @@ private fun QueuePanel(player: PlayerController, actions: VideoActions, modifier
                             val current = i == player.index
                             TrackRow(
                                 modifier = Modifier.reorderable(reorder, q.url),
+                                grip = true,
                                 number = if (current) "▶" else "${i + 1}",
                                 item = q,
                                 zebra = i % 2 == 1,
