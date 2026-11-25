@@ -63,6 +63,8 @@ import newpipe.desktop.data.SearchKind
 import newpipe.desktop.ui.ChannelScreen
 import newpipe.desktop.ui.ChannelState
 import newpipe.desktop.ui.InputFocus
+import newpipe.desktop.ui.GlassWindowFrame
+import newpipe.desktop.ui.WindowMaximizer
 import newpipe.desktop.ui.LocalScreen
 import newpipe.desktop.ui.LocalState
 import newpipe.desktop.ui.SettingsWindow
@@ -259,12 +261,14 @@ fun main() {
             mainWindow.isMinimized = true
         }
 
+        val maximizer = remember { WindowMaximizer() }
         Window(
             onCloseRequest = {
                 if (settings.value.closeToTray) toTray() else quit()
             },
             state = mainWindow,
             visible = windowVisible,
+            undecorated = true,   // we draw our own Windows 7 style glass frame and buttons
             title = player.current?.let { "${it.title} – ChudPlayer" } ?: "ChudPlayer",
             onKeyEvent = { handleShortcut(it, player) },
         ) {
@@ -272,7 +276,12 @@ fun main() {
                 Box(Modifier.fillMaxSize().background(Aero.bgDeep)) {
                     if (player.fullscreen) {
                         PlayerScreen(player, actions)
-                    } else {
+                    } else GlassWindowFrame(
+                        title = player.current?.let { "${it.title} – ChudPlayer" } ?: "ChudPlayer",
+                        maximizer = maximizer,
+                        onMinimize = { mainWindow.isMinimized = true },
+                        onClose = { if (settings.value.closeToTray) toTray() else quit() },
+                    ) {
                         Column(Modifier.fillMaxSize()) {
                             TopBar(player, search.query, { search.query = it }, ::submitSearch)
                             val info = when (app.screen) {
