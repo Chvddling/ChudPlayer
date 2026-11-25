@@ -68,12 +68,14 @@ class YouTubeRepo(private val squid: SubsonicClient) {
         Service.YOUTUBE -> ServiceList.YouTube
         Service.SOUNDCLOUD -> ServiceList.SoundCloud
         Service.SQUIDIFY -> throw IllegalStateException("Squidify is not a NewPipe service")
+        Service.LOCAL -> throw IllegalStateException("Local music is not a NewPipe service")
     }
 
     /** Which supported service a link belongs to (YouTube or SoundCloud), or null. */
     fun serviceOfUrl(text: String): Service? = runCatching {
         val url = text.trim()
         if (SubsonicClient.parse(url)?.first == "song") return@runCatching Service.SQUIDIFY
+        if (LocalMusic.isLocal(url)) return@runCatching Service.LOCAL
         val s = NewPipe.getServiceByUrl(url)
         val supported = Service.entries.firstOrNull { it.id == s.serviceId }
         if (supported != null && s.streamLHFactory.acceptUrl(url)) supported else null
@@ -93,11 +95,12 @@ class YouTubeRepo(private val squid: SubsonicClient) {
             SearchKind.CHANNELS -> "users"
             SearchKind.PLAYLISTS -> "playlists"
         }
-        Service.SQUIDIFY -> ""
+        Service.SQUIDIFY, Service.LOCAL -> ""
     }
 
     fun search(query: String, service: Service = Service.YOUTUBE, kind: SearchKind = SearchKind.ITEMS): ListPage {
         if (service == Service.SQUIDIFY) return squid.search(query, kind)
+        if (service == Service.LOCAL) return ListPage(emptyList(), null, null)
         val s = np(service)
         val handler = s.searchQHFactory.fromQuery(query, listOf(filterFor(service, kind)), "")
         val info = SearchInfo.getInfo(s, handler)
@@ -177,6 +180,7 @@ class YouTubeRepo(private val squid: SubsonicClient) {
 
     fun streamDetails(url: String): StreamDetails {
         SubsonicClient.parse(url)?.let { (type, id) -> if (type == "song") return squidifySong(id) }
+        LocalMusic.fileOf(url)?.let { return LocalMusic.details(it) }
         val service = NewPipe.getServiceByUrl(url)
         val info = StreamInfo.getInfo(service, url)
         val item = VideoItem(

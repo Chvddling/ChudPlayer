@@ -96,6 +96,7 @@ object Aero {
     val ytRed = Color(0xFFD4231A)
     val scOrange = Color(0xFFE85D00)
     val squidPurple = Color(0xFF7B4FD6)
+    val localGreen = Color(0xFF2E8B3E)
     val selectionBorder = Color(0xFF3D7FBF)
 }
 
@@ -108,6 +109,7 @@ object Gloss {
     val button = gloss(Color(0xFF4A5563), Color(0xFF2B333E), Color(0xFF1B2129), Color(0xFF2C343E))
     val orange = gloss(Color(0xFFFFB06A), Color(0xFFFF7417), Color(0xFFE25200), Color(0xFFFF8A30))
     val red = gloss(Color(0xFFFF8A80), Color(0xFFE0261C), Color(0xFFB50E07), Color(0xFFE2392E))
+    val green = gloss(Color(0xFFA6E8A0), Color(0xFF45A83C), Color(0xFF2B8424), Color(0xFF52B848))
     val purple = gloss(Color(0xFFC6A8FF), Color(0xFF8457E0), Color(0xFF6438C4), Color(0xFF9468EA))
     val blue = gloss(Color(0xFF8CCBFF), Color(0xFF3A8EE0), Color(0xFF1E6BC2), Color(0xFF4A9DEA))
     val selection = gloss(Color(0x736EB4FF), Color(0x4D3278D2), Color(0x591E5AB4), Color(0x66468CE6))
@@ -122,8 +124,8 @@ object Gloss {
 }
 
 fun serviceName(id: Int) = newpipe.desktop.data.Service.of(id).label
-fun serviceColor(id: Int) = when (id) { 1 -> Aero.scOrange; 100 -> Aero.squidPurple; else -> Aero.ytRed }
-fun serviceBrush(id: Int) = when (id) { 1 -> Gloss.orange; 100 -> Gloss.purple; else -> Gloss.red }
+fun serviceColor(id: Int) = when (id) { 1 -> Aero.scOrange; 100 -> Aero.squidPurple; 200 -> Aero.localGreen; else -> Aero.ytRed }
+fun serviceBrush(id: Int) = when (id) { 1 -> Gloss.orange; 100 -> Gloss.purple; 200 -> Gloss.green; else -> Gloss.red }
 /** "plays" for music services, "views" for YouTube. */
 fun playsWord(id: Int) = if (id == 0) "views" else "plays"
 
@@ -423,6 +425,12 @@ object ImageCache {
         synchronized(cache) { cache[url] }?.let { return it }
         val bmp = withContext(Dispatchers.IO) {
             runCatching {
+                // Local album art: embedded in the file or cover.jpg next to it
+                if (url.startsWith(newpipe.desktop.data.LocalMusic.COVER_PREFIX)) {
+                    val f = java.io.File(url.removePrefix(newpipe.desktop.data.LocalMusic.COVER_PREFIX))
+                    return@runCatching newpipe.desktop.data.LocalMusic.cover(f)
+                        ?.let { org.jetbrains.skia.Image.makeFromEncoded(it).toComposeImageBitmap() }
+                }
                 val req = okhttp3.Request.Builder().url(url).header("User-Agent", Http.USER_AGENT).build()
                 Http.client.newCall(req).execute().use { resp ->
                     if (!resp.isSuccessful) null

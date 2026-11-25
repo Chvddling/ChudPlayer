@@ -320,7 +320,7 @@ class PlayerController(
             } catch (e: Exception) {
                 e.printStackTrace()
                 // NewPipeExtractor couldn't handle it (e.g. YouTube changed something): try the yt-dlp backup.
-                if (e !is ReCaptchaException && item.serviceId != Service.SQUIDIFY.id && YtDlp.ready && playWithYtDlp(item, seekTo)) {
+                if (e !is ReCaptchaException && item.serviceId != Service.SQUIDIFY.id && item.serviceId != Service.LOCAL.id && YtDlp.ready && playWithYtDlp(item, seekTo)) {
                     backupNotice = "NewPipe couldn't load this (${e.message ?: e::class.simpleName}) — playing through the yt-dlp backup."
                     history.add(item)
                 } else {
@@ -389,7 +389,7 @@ class PlayerController(
     /** If the direct stream fails, let mpv ask yt-dlp (only works if yt-dlp.exe is on PATH). */
     private fun tryYtDlpFallback(): Boolean {
         val item = current ?: return false
-        if (item.serviceId == Service.SQUIDIFY.id) return false
+        if (item.serviceId == Service.SQUIDIFY.id || item.serviceId == Service.LOCAL.id) return false
         if (triedYtDlp || mpv == null) return false
         val ok = playWithYtDlp(item, position.takeIf { it > 1 })
         if (ok) backupNotice = "The direct stream failed — playing through the yt-dlp backup."

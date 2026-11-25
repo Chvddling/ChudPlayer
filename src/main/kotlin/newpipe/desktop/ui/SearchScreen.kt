@@ -41,7 +41,7 @@ class SearchState(private val repo: YouTubeRepo, private val scope: CoroutineSco
     fun changeService(s: Service) {
         if (s == service) return
         service = s
-        if (lastQuery.isNotEmpty()) search(lastQuery)
+        if (lastQuery.isNotEmpty() && s != Service.LOCAL) search(lastQuery)
     }
 
     fun changeKind(k: SearchKind) {
@@ -105,6 +105,7 @@ class SearchState(private val repo: YouTubeRepo, private val scope: CoroutineSco
         Service.YOUTUBE -> listOf("Videos", "Channels", "Playlists")
         Service.SOUNDCLOUD -> listOf("Tracks", "Artists", "Playlists")
         Service.SQUIDIFY -> listOf("Songs", "Artists", "Albums")
+        Service.LOCAL -> emptyList()
     }
 
     /** Text for the service bar, e.g. 24 results for “outrun”. */

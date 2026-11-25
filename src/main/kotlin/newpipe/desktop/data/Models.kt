@@ -24,7 +24,9 @@ enum class Service(val id: Int, val label: String) {
     YOUTUBE(0, "YouTube"),
     SOUNDCLOUD(1, "SoundCloud"),
     /** Subsonic/Navidrome server (not a NewPipe service). */
-    SQUIDIFY(100, "Squidify");
+    SQUIDIFY(100, "Squidify"),
+    /** Music files on this PC. */
+    LOCAL(200, "My Music");
 
     companion object {
         fun of(id: Int): Service = entries.firstOrNull { it.id == id } ?: YOUTUBE

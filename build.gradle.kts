@@ -33,6 +33,9 @@ dependencies {
     implementation("net.java.dev.jna:jna:5.17.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
+
+    // Reads tags and cover art from local music files (mp3, flac, ogg, m4a, wav, wma, aiff…)
+    implementation("net.jthink:jaudiotagger:3.0.1")
 }
 
 // Bake the version numbers into the app so it can check for updates.

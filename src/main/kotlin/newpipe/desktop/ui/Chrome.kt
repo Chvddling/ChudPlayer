@@ -273,12 +273,14 @@ fun StatusBar(
     autoUpdate: Boolean,
     onToggleAutoUpdate: () -> Unit,
     onUpdateYtDlp: () -> Unit,
+    onSettings: () -> Unit,
 ) {
     Row(
         Modifier.fillMaxWidth().height(28.dp).background(Gloss.statusBar).edgeLine(bottom = false).padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        GlossButton("Settings", onSettings, round = false, height = 20.dp)
         GlossButton("Mini player", onMiniPlayer, round = false, height = 20.dp)
         val audio = player.mode == PlayMode.AUDIO
         GlossButton(
@@ -317,6 +319,7 @@ fun StatusBar(
         // Version label: right-click for update options
         ContextMenuArea(items = {
             listOf(
+                ContextMenuItem("Settings…") { onSettings() },
                 ContextMenuItem("Check for updates now") { updater.check(manual = true) },
                 ContextMenuItem(if (autoUpdate) "Turn off automatic update checks" else "Turn on automatic update checks") { onToggleAutoUpdate() },
                 ContextMenuItem("Update yt-dlp backup now") { onUpdateYtDlp() },

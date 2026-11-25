@@ -94,7 +94,9 @@ class VideoActions(
             ContextMenuItem("Add to playlist…") { addToPlaylist(listOf(item)) },
         )
         if (!item.uploaderUrl.isNullOrBlank()) {
-            menu += ContextMenuItem("Go to channel${if (item.uploader.isNotBlank()) ": " + item.uploader else ""}") { openChannel(item.uploaderUrl) }
+            val label = if (item.uploaderUrl!!.startsWith(newpipe.desktop.data.LocalMusic.FOLDER_PREFIX)) "Open folder"
+            else "Go to channel${if (item.uploader.isNotBlank()) ": " + item.uploader else ""}"
+            menu += ContextMenuItem(label) { openChannel(item.uploaderUrl) }
         }
         // Quick "add to" entries for the first few playlists that don't have it yet
         playlists.playlists

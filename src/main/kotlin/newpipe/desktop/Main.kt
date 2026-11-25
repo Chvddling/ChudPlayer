@@ -60,6 +60,11 @@ import newpipe.desktop.data.SearchKind
 import newpipe.desktop.ui.ChannelScreen
 import newpipe.desktop.ui.ChannelState
 import newpipe.desktop.ui.InputFocus
+import newpipe.desktop.ui.LocalScreen
+import newpipe.desktop.ui.LocalState
+import newpipe.desktop.ui.SettingsWindow
+import newpipe.desktop.ui.chooseFolder
+import newpipe.desktop.data.LocalMusic
 import newpipe.desktop.ui.RemotePlaylistScreen
 import newpipe.desktop.ui.RemotePlaylistState
 import newpipe.desktop.update.Updater
@@ -81,6 +86,7 @@ class AppState {
     val screen: Screen get() = nav.screen
     val openPlaylistId: String? get() = nav.playlistId
     var miniPlayerOpen by mutableStateOf(false)
+    var settingsOpen by mutableStateOf(false)
     var playlistDialog by mutableStateOf<PlaylistDialog?>(null)
 
     fun go(n: Nav) {
@@ -101,6 +107,8 @@ class AppState {
 
 fun main() {
     System.setProperty("jna.encoding", "UTF-8")
+    // Native Windows look for the folder picker
+    runCatching { javax.swing.UIManager.setLookAndFeel(javax.swing.UIManager.getSystemLookAndFeelClassName()) }
     // Show menus and popups as their own small windows, so they appear on top of the (native) video.
     System.setProperty("compose.layers.type", "WINDOW")
     MpvLib.prepareSearchPath()
@@ -118,13 +126,24 @@ fun main() {
         val player = remember { PlayerController(repo, history, settings, VideoHost()) }
         val search = remember { SearchState(repo, CoroutineScope(SupervisorJob() + Dispatchers.Main)) }
         val bgScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Main) }
+        val local = remember { LocalState(settings, bgScope) }
         val actions = remember {
             VideoActions(
                 player = player,
                 playlists = playlists,
                 showDialog = { app.playlistDialog = it },
                 openPlayer = { app.go(Nav(Screen.Player)) },
-                openChannelPage = { url -> app.go(Nav(Screen.Channel, channel = ChannelState(url, repo, bgScope))) },
+                openChannelPage = { url ->
+                    val folder = LocalMusic.folderOf(url)
+                    if (folder != null) {
+                        // a local song's "channel" is its folder
+                        search.changeService(Service.LOCAL)
+                        local.open(folder)
+                        app.go(Nav(Screen.Search))
+                    } else {
+                        app.go(Nav(Screen.Channel, channel = ChannelState(url, repo, bgScope)))
+                    }
+                },
                 openPlaylistPage = { url -> app.go(Nav(Screen.RemotePlaylist, remote = RemotePlaylistState(url, repo, bgScope))) },
             )
         }
@@ -151,6 +170,8 @@ fun main() {
         fun submitSearch() {
             val q = search.query.trim()
             if (q.isEmpty()) return
+            // "My Music" is browse-only: searching goes to YouTube
+            if (search.service == Service.LOCAL) search.changeService(Service.YOUTUBE)
             if (repo.isVideoUrl(q)) {
                 player.playUrl(q)
                 app.go(Nav(Screen.Player))
@@ -183,7 +204,9 @@ fun main() {
                         Column(Modifier.fillMaxSize()) {
                             TopBar(player, search.query, { search.query = it }, ::submitSearch)
                             val info = when (app.screen) {
-                                Screen.Search -> search.summary()
+                                Screen.Search -> if (search.service == Service.LOCAL) {
+                                    "My Music · ${local.selected?.absolutePath ?: "choose a music folder"} · right-click songs for more options"
+                                } else search.summary()
                                 Screen.Player -> player.current?.let { "Playing from ${serviceName(it.serviceId)}" + (if (player.sourceLabel.isNotEmpty()) " · ${player.sourceLabel}" else "") } ?: ""
                                 Screen.Playlists -> "Right-click a playlist or a song for more options"
                                 Screen.History -> "Right-click a song for more options"
@@ -195,7 +218,7 @@ fun main() {
                                 serviceId = search.service.id,
                                 onService = { search.changeService(Service.of(it)); app.go(Nav(Screen.Search)) },
                                 info = info,
-                                kindLabels = if (onSearch) search.kindLabels() else null,
+                                kindLabels = if (onSearch && search.service != Service.LOCAL) search.kindLabels() else null,
                                 kind = search.kind.ordinal,
                                 onKind = { search.changeKind(SearchKind.entries[it]) },
                             )
@@ -205,7 +228,9 @@ fun main() {
                                 }
                                 Box(Modifier.weight(1f).fillMaxHeight().background(Gloss.content)) {
                                     when (app.screen) {
-                                        Screen.Search -> SearchScreen(search, actions)
+                                        Screen.Search -> if (search.service == Service.LOCAL) {
+                                            LocalScreen(local, actions, onChooseFolder = { chooseFolder(local.root)?.let { local.setRoot(it) } })
+                                        } else SearchScreen(search, actions)
                                         Screen.Player -> PlayerScreen(player, actions)
                                         Screen.Playlists -> PlaylistsScreen(playlists, actions, app.openPlaylistId) { app.go(Nav(Screen.Playlists, playlistId = it)) }
                                         Screen.History -> HistoryScreen(history, actions)
@@ -234,11 +259,27 @@ fun main() {
                                     settings.update { it.copy(autoUpdate = autoUpdate) }
                                 },
                                 onUpdateYtDlp = { bgScope.launch { YtDlp.ensure(force = true) } },
+                                onSettings = { app.settingsOpen = true },
                             )
                         }
                     }
                     // Must stay last and always composed: hosts mpv's native video window.
                     VideoLayer(player.video)
+                }
+
+                if (app.settingsOpen) {
+                    SettingsWindow(
+                        settings = settings,
+                        local = local,
+                        updater = updater,
+                        autoUpdate = autoUpdate,
+                        onToggleAutoUpdate = {
+                            autoUpdate = !autoUpdate
+                            settings.update { it.copy(autoUpdate = autoUpdate) }
+                        },
+                        scope = bgScope,
+                        onClose = { app.settingsOpen = false },
+                    )
                 }
 
                 PlaylistDialogHost(

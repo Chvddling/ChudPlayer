@@ -55,6 +55,10 @@ data class Settings(
     val squidifyUrl: String = "https://www.squidify.net",
     val squidifyUser: String = "Guest",
     val squidifyPassword: String = "Guest",
+    /** Main music folder for "My Music" (empty = the Windows Music folder). */
+    val musicFolder: String = "",
+    /** The folder that was open last time in "My Music". */
+    val lastLocalFolder: String = "",
 )
 
 class SettingsStore {

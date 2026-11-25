@@ -1,6 +1,6 @@
 # ChudPlayer
 
-A NewPipe-style YouTube, SoundCloud & Squidify player for Windows. No ads, no account, no tracking,
+An all-in-one player for Windows: YouTube, SoundCloud, Squidify and your own music files. No ads, no account, no tracking,
 background audio, local playlists. It has a dark Windows 7 "smoked glass" look with an iTunes-style layout.
 
 ChudPlayer uses [NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor), the same library
@@ -35,6 +35,9 @@ off and on, or update yt-dlp.
 - Search YouTube or SoundCloud, or paste a link from either one
 - **Squidify** (www.squidify.net): game, anime, movie & TV soundtracks, often lossless, through its public
   Subsonic/Navidrome API (guest login). Search songs, artists and albums; open artist and album pages.
+- **My Music**: browse the music folders on your PC in a folder tree and play your files
+  (mp3, flac, wav, ogg, opus, m4a/aac, wma, aiff, ape, …) with their tags and cover art.
+  Choose the main music folder in **Settings**; the last opened folder is remembered.
 - Playback modes in the top bar: repeat song, shuffle, loop queue, autoplay
 - Hold and drag songs in the queue or your playlists to reorder them
 - Channel / artist pages (uploads newest first, playlists, search inside a channel), history search
