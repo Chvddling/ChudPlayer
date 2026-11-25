@@ -7,12 +7,8 @@ ChudPlayer uses [NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtract
 the Android [NewPipe](https://newpipe.net) app uses to read YouTube and SoundCloud, and
 [mpv](https://mpv.io) for playback. It is not affiliated with TeamNewPipe.
 
-## Download
+<img width="500" height="400" alt="Screenshot 2026-11-25 031947" src="https://github.com/user-attachments/assets/979657df-360a-4974-b312-24cb76e2dbcb" />
 
-1. Go to **[Releases](../../releases/latest)** and download `ChudPlayer-windows-x64.zip`.
-2. Unzip it somewhere you can write to (for example `Documents\ChudPlayer` or `D:\Apps\ChudPlayer`).
-   Avoid `Program Files`, because the auto-updater can't write there.
-3. Run `ChudPlayer.exe`. Java is bundled, so you don't need to install anything.
 
 ## Phone remote (Android)
 
@@ -32,6 +28,15 @@ To lock out old phones, use "New pairing code" in Settings.
 
 The APK is signed with a key kept in this repo (`android/keystore`), so every new APK installs over the old one.
 That also means anyone could sign an APK with the same key, so only install ChudPlayer Remote from this repo's Releases.
+
+<p float="left">
+  <img width="280" height="585" alt="Screenshot_20261125_032403_ChudPlayer Remote" src="https://github.com/user-attachments/assets/26f5b34d-fbec-4445-b845-8bd95af7ac7f" />
+  <img width="280" height="585" alt="22" src="https://github.com/user-attachments/assets/ed9c61d3-87ac-462a-8f2a-58ac9186062a" / 
+
+</p>
+
+>
+
 
 ## Staying up to date (automatically)
 
@@ -63,12 +68,10 @@ off and on, or update yt-dlp.
   click the tray icon to bring it back, right-click it for play/pause, next, previous and exit
 - Channel / artist pages (uploads newest first, playlists, search inside a channel), history search
 - Embedded video player (mpv) with quality picker, fullscreen (F11 / double-click), volume and seeking
-- **Audio only** mode, which is NewPipe's background player
 - **Mini player**: a small always-on-top window, while the main window gets minimized
 - Queue, autoplay of related videos, watch history
 - **Local playlists**: create, rename, reorder, play, shuffle or play in background
-- **Right-click** any video or song for Play next, Add to queue, Add to playlist and
-  Save current queue as playlist
+
 
 Your data lives in `%APPDATA%\ChudPlayer\` (`playlists.json`, `history.json`, `settings.json`).
 
@@ -109,6 +112,15 @@ src/main/kotlin/newpipe/desktop/
   ui/                        the Smoked Glass theme and all screens
 .github/workflows/build.yml  daily NewPipeExtractor check + Windows build + release
 ```
+
+## Previews
+<img width="961" height="767" alt="Screenshot 2026-11-25 032348" src="https://github.com/user-attachments/assets/fd9f0c4a-1128-46ad-99f3-e98e15565621" />
+<img width="964" height="766" alt="Screenshot 2026-11-25 032333" src="https://github.com/user-attachments/assets/7da418e3-bce3-4de8-9198-59c7fd8c0f4c" />
+<img width="966" height="769" alt="Screenshot 2026-11-25 032120" src="https://github.com/user-attachments/assets/fdffce82-d05a-46c9-97b1-69519efb572e" />
+<img width="960" height="776" alt="Screenshot 2026-11-25 032050" src="https://github.com/user-attachments/assets/177d5760-4672-4dd0-969c-50dfe4eaeb9b" />
+<img width="959" height="768" alt="Screenshot 2026-11-25 031947" src="https://github.com/user-attachments/assets/5cef4106-2df7-48f8-94c9-2cecf6e7bd8a" />
+<img width="501" height="158" alt="Screenshot 2026-11-25 031841" src="https://github.com/user-attachments/assets/eac4d0d6-0cba-4f99-8888-8c1dd43c5cae" />
+
 
 ## License
 
