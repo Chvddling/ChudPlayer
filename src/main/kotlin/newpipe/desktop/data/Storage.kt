@@ -45,6 +45,12 @@ data class Settings(
     val autoUpdate: Boolean = true,
     /** Keep a copy of yt-dlp up to date and use it when NewPipeExtractor fails. */
     val ytDlpBackup: Boolean = true,
+    /** Play the current song over and over. */
+    val repeatOne: Boolean = false,
+    /** Play the queue in random order. */
+    val shuffle: Boolean = false,
+    /** Start the queue again after the last song. */
+    val loopQueue: Boolean = false,
 )
 
 class SettingsStore {

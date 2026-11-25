@@ -139,10 +139,12 @@ private fun DetailList(p: Playlist, store: PlaylistStore, actions: VideoActions)
     Column(Modifier.fillMaxSize()) {
         TrackHeader(trailingWidth = 72.dp)
         val state = rememberLazyListState()
+        val reorder = rememberReorderState(state) { from, to -> store.move(p.id, from, to) }
         Box(Modifier.fillMaxSize()) {
             LazyColumn(Modifier.fillMaxSize(), state = state) {
                 itemsIndexed(p.items, key = { _, it -> it.url }) { i, item ->
                     TrackRow(
+                        modifier = Modifier.reorderable(reorder, item.url),
                         number = "${i + 1}",
                         item = item,
                         zebra = i % 2 == 1,

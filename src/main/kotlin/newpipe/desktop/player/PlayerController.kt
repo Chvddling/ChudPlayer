@@ -76,6 +76,12 @@ class PlayerController(
     var mode by mutableStateOf(runCatching { PlayMode.valueOf(settings.value.mode) }.getOrDefault(PlayMode.VIDEO)); private set
     var maxHeight by mutableStateOf(settings.value.maxHeight); private set
     var autoplay by mutableStateOf(settings.value.autoplay); private set
+    var repeatOne by mutableStateOf(settings.value.repeatOne); private set
+    var shuffle by mutableStateOf(settings.value.shuffle); private set
+    var loopQueue by mutableStateOf(settings.value.loopQueue); private set
+
+    /** Songs played while shuffling (urls, in order), so shuffle doesn't repeat and "previous" works. */
+    private val shufflePlayed = mutableListOf<String>()
 
     private var mpv: Mpv? = null
     private var loadJob: Job? = null
@@ -88,8 +94,11 @@ class PlayerController(
 
     fun play(items: List<VideoItem>, start: Int = 0) {
         if (items.isEmpty()) return
-        queue = items
-        index = start.coerceIn(0, items.lastIndex)
+        val startUrl = items.getOrNull(start)?.url
+        val unique = items.distinctBy { it.url }
+        queue = unique
+        index = unique.indexOfFirst { it.url == startUrl }.coerceAtLeast(0)
+        shufflePlayed.clear()
         loadCurrent()
     }
 
@@ -130,13 +139,28 @@ class PlayerController(
     }
 
     fun enqueue(item: VideoItem) {
+        if (queue.any { it.url == item.url }) return
         queue = queue + item
         if (index < 0) { index = 0; loadCurrent() }
     }
 
     fun playNext(item: VideoItem) {
         if (index < 0) { enqueue(item); return }
-        queue = queue.toMutableList().apply { add(index + 1, item) }
+        if (queue.getOrNull(index)?.url == item.url) return
+        val cur = current
+        val list = queue.filter { it.url != item.url }.toMutableList()
+        val at = list.indexOfFirst { it.url == cur?.url }
+        list.add(at + 1, item)
+        queue = list
+        index = at
+    }
+
+    /** Drag & drop in the queue. */
+    fun moveInQueue(from: Int, to: Int) {
+        if (from !in queue.indices || to !in queue.indices || from == to) return
+        val cur = current
+        queue = queue.toMutableList().apply { add(to, removeAt(from)) }
+        index = queue.indexOfFirst { it.url == cur?.url }
     }
 
     fun jumpTo(i: Int) {
@@ -156,20 +180,66 @@ class PlayerController(
         }
     }
 
+    /** Next song, following shuffle / loop / autoplay. */
     fun next() {
+        if (queue.isEmpty()) return
+        if (shuffle) {
+            val played = shufflePlayed.toSet()
+            val unplayed = queue.indices.filter { it != index && queue[it].url !in played }
+            when {
+                unplayed.isNotEmpty() -> { index = unplayed.random(); loadCurrent() }
+                loopQueue -> {
+                    shufflePlayed.clear()
+                    val others = queue.indices.filter { it != index }
+                    index = if (others.isEmpty()) index else others.random()
+                    loadCurrent()
+                }
+                autoplay -> autoplayRelated()
+            }
+            return
+        }
         when {
             index < queue.lastIndex -> { index++; loadCurrent() }
+            loopQueue -> { index = 0; loadCurrent() }
             autoplay -> autoplayRelated()
         }
     }
 
     fun previous() {
-        if (position > 5 || index <= 0) seek(0.0) else { index--; loadCurrent() }
+        if (position > 5) { seek(0.0); return }
+        if (shuffle && shufflePlayed.size >= 2) {
+            shufflePlayed.removeAt(shufflePlayed.lastIndex)          // the current song
+            val prevUrl = shufflePlayed.removeAt(shufflePlayed.lastIndex)
+            val i = queue.indexOfFirst { it.url == prevUrl }
+            if (i >= 0) { index = i; loadCurrent(); return }
+        }
+        if (index <= 0) {
+            if (loopQueue && queue.size > 1) { index = queue.lastIndex; loadCurrent() } else seek(0.0)
+        } else { index--; loadCurrent() }
+    }
+
+    fun changeRepeatOne(on: Boolean) {
+        repeatOne = on
+        settings.update { it.copy(repeatOne = on) }
+        mpvCmd { it.setProperty("loop-file", if (on) "inf" else "no") }
+    }
+
+    fun changeShuffle(on: Boolean) {
+        shuffle = on
+        settings.update { it.copy(shuffle = on) }
+        shufflePlayed.clear()
+        current?.let { shufflePlayed.add(it.url) }
+    }
+
+    fun changeLoopQueue(on: Boolean) {
+        loopQueue = on
+        settings.update { it.copy(loopQueue = on) }
     }
 
     fun stop() {
         loadJob?.cancel()
         queue = emptyList(); index = -1; details = null; loading = false; error = null
+        shufflePlayed.clear()
         position = 0.0; duration = 0.0
         mpvCmd { it.command("stop") }
     }
@@ -228,6 +298,9 @@ class PlayerController(
 
     private fun loadCurrent(seekTo: Double? = null) {
         val item = current ?: return
+        shufflePlayed.remove(item.url)
+        shufflePlayed.add(item.url)
+        if (shufflePlayed.size > 500) shufflePlayed.removeAt(0)
         loadJob?.cancel()
         details = null; error = null; loading = true; sourceLabel = ""; backupNotice = null
         position = 0.0; duration = item.durationSec.coerceAtLeast(0).toDouble()
@@ -343,6 +416,7 @@ class PlayerController(
         return try {
             Mpv(video.windowId(), ytdl, ::onMpvEvent).also {
                 it.setProperty("volume", volume.toInt().toString())
+                if (repeatOne) it.setProperty("loop-file", "inf")
                 mpv = it
                 mpvKnowsYtDlp = ytdl != null
             }

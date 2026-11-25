@@ -223,11 +223,13 @@ private fun QueuePanel(player: PlayerController, actions: VideoActions, modifier
             0 -> {
                 TrackHeader(trailingWidth = 24.dp)
                 val state = rememberLazyListState()
+                val reorder = rememberReorderState(state) { from, to -> player.moveInQueue(from, to) }
                 Box(Modifier.fillMaxSize()) {
                     LazyColumn(Modifier.fillMaxSize(), state = state) {
-                        itemsIndexed(player.queue) { i, q ->
+                        itemsIndexed(player.queue, key = { _, q -> q.url }) { i, q ->
                             val current = i == player.index
                             TrackRow(
+                                modifier = Modifier.reorderable(reorder, q.url),
                                 number = if (current) "▶" else "${i + 1}",
                                 item = q,
                                 zebra = i % 2 == 1,

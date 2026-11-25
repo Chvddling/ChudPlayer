@@ -481,3 +481,44 @@ fun VideoItem.subtitle(): String = listOfNotNull(
     formatCount(viewCount).takeIf { it.isNotEmpty() }?.let { if (serviceId == 1) "$it plays" else "$it views" },
     uploadDate?.takeIf { it.isNotBlank() },
 ).joinToString(" · ")
+
+/** Small square glossy on/off button with a tooltip (repeat, shuffle, loop, autoplay). */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+fun ModeToggle(icon: ImageVector, label: String, on: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(4.dp)
+    androidx.compose.foundation.TooltipArea(
+        tooltip = {
+            Text(
+                label + if (on) " (on)" else " (off)",
+                color = Aero.textBright,
+                fontSize = 11.sp,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Color(0xF01A212B))
+                    .border(1.dp, Color.Black, RoundedCornerShape(3.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+        },
+        delayMillis = 400,
+    ) {
+        Box(
+            Modifier
+                .size(28.dp)
+                .drawBehind {
+                    if (on) drawCircle(
+                        brush = Brush.radialGradient(listOf(Color(0x665AB4FF), Color.Transparent), center = center, radius = this.size.minDimension),
+                        radius = this.size.minDimension,
+                    )
+                }
+                .clip(shape)
+                .background(if (on) Gloss.blue else Gloss.button)
+                .border(1.dp, Color.Black, shape)
+                .clickable(role = Role.Switch, onClickLabel = label, onClick = onClick)
+                .semantics { contentDescription = label },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, null, tint = if (on) Color.White else Aero.textDim, modifier = Modifier.size(16.dp))
+        }
+    }
+}

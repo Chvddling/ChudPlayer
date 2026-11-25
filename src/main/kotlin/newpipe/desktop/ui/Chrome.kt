@@ -27,7 +27,11 @@ import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -89,7 +93,13 @@ fun TopBar(player: PlayerController, query: String, onQueryChange: (String) -> U
                 primary = true,
             )
             OrbButton({ player.next() }, "Next", Icons.Filled.SkipNext, 32.dp)
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(10.dp))
+            // playback modes
+            ModeToggle(Icons.Filled.RepeatOne, "Repeat this song", player.repeatOne) { player.changeRepeatOne(!player.repeatOne) }
+            ModeToggle(Icons.Filled.Shuffle, "Shuffle (play the queue in random order)", player.shuffle) { player.changeShuffle(!player.shuffle) }
+            ModeToggle(Icons.Filled.Repeat, "Loop queue (start over after the last song)", player.loopQueue) { player.changeLoopQueue(!player.loopQueue) }
+            ModeToggle(Icons.Filled.AllInclusive, "Autoplay (play related songs when the queue ends)", player.autoplay) { player.changeAutoplay(!player.autoplay) }
+            Spacer(Modifier.width(10.dp))
             Icon(Icons.AutoMirrored.Filled.VolumeUp, "Volume", tint = Aero.textDim, modifier = Modifier.size(16.dp))
             var vol by remember { mutableStateOf<Float?>(null) }
             GlossSlider(
@@ -272,10 +282,17 @@ fun StatusBar(
             textColor = if (audio) Color.White else Aero.text,
             round = false, height = 20.dp,
         )
-        val info = if (player.queue.isEmpty()) "Queue empty" else listOf(
-            "${player.queue.size} in queue",
+        val modes = listOfNotNull(
+            "Repeat song".takeIf { player.repeatOne },
+            "Shuffle".takeIf { player.shuffle },
+            "Loop queue".takeIf { player.loopQueue },
+            "Autoplay".takeIf { player.autoplay },
+        ).joinToString(", ")
+        val info = listOf(
+            if (player.queue.isEmpty()) "Queue empty" else "${player.queue.size} in queue",
             formatTotal(player.queueSeconds),
-            if (player.autoplay) "Autoplay on" else "Autoplay off",
+            modes,
+            if (player.queue.size > 1) "hold & drag songs to reorder" else "",
         ).filter { it.isNotEmpty() }.joinToString(" · ")
         Text(info, color = Aero.textDim, fontSize = 11.sp, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
 

@@ -160,9 +160,11 @@ fun TrackRow(
     actions: VideoActions,
     selected: Boolean = false,
     extraMenu: () -> List<ContextMenuItem> = { emptyList() },
+    modifier: Modifier = Modifier,
     trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
-    VideoMenuArea(actions, item, extraMenu) {
+    // [modifier] goes on the outermost box so drag & drop can lift the whole row
+    Box(modifier.fillMaxWidth()) { VideoMenuArea(actions, item, extraMenu) {
         val color = if (selected) Color.White else Aero.text
         Row(
             Modifier
@@ -187,6 +189,7 @@ fun TrackRow(
             trailing?.invoke(this)
         }
     }
+}
 }
 
 // ---------------- grid card with reflection ----------------
