@@ -62,7 +62,7 @@ private fun playlistMenu(p: Playlist, actions: VideoActions): List<ContextMenuIt
 private fun PlaylistOverview(store: PlaylistStore, actions: VideoActions, onOpen: (String?) -> Unit) {
     Column(Modifier.fillMaxSize()) {
         PageHeader("Playlists", "${store.playlists.size} playlists") {
-            GlossButton("New playlist", { actions.newPlaylist() }, brush = Gloss.blue, textColor = Color.White, bold = true)
+            GlossButton("New playlist", { actions.newPlaylist() }, brush = Gloss.blue, textColor = Aero.onAccent, bold = true)
             GlossButton("Save queue as playlist", { actions.saveQueueAsPlaylist() }, enabled = actions.player.queue.isNotEmpty())
         }
         if (store.playlists.isEmpty()) {
@@ -94,7 +94,7 @@ private fun OverviewList(store: PlaylistStore, actions: VideoActions, onOpen: (S
                                 Text(p.summary(), color = Aero.textDim, fontSize = 11.sp)
                             }
                             val has = p.items.isNotEmpty()
-                            GlossButton("Play", { actions.playAll(p.items) }, enabled = has, brush = Gloss.blue, textColor = Color.White, bold = true)
+                            GlossButton("Play", { actions.playAll(p.items) }, enabled = has, brush = Gloss.blue, textColor = Aero.onAccent, bold = true)
                             GlossButton("Shuffle", { actions.shuffle(p.items) }, enabled = has)
                         }
                     }
@@ -120,7 +120,7 @@ private fun PlaylistDetail(p: Playlist, store: PlaylistStore, actions: VideoActi
         PageHeader(p.name, p.summary()) {
             val has = p.items.isNotEmpty()
             GlossButton("◀ All playlists", onBack)
-            GlossButton("Play", { actions.playAll(p.items) }, enabled = has, brush = Gloss.blue, textColor = Color.White, bold = true)
+            GlossButton("Play", { actions.playAll(p.items) }, enabled = has, brush = Gloss.blue, textColor = Aero.onAccent, bold = true)
             GlossButton("Shuffle", { actions.shuffle(p.items) }, enabled = has)
             GlossButton("Rename", { actions.renamePlaylist(p.id, p.name) })
             GlossButton("Delete", { actions.deletePlaylist(p.id, p.name) })

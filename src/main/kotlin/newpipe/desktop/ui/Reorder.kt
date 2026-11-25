@@ -1,5 +1,6 @@
 package newpipe.desktop.ui
 
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.LazyListState
@@ -97,6 +98,16 @@ fun rememberReorderState(list: LazyListState, onMove: (from: Int, to: Int) -> Un
     val scope = rememberCoroutineScope()
     val move by rememberUpdatedState(onMove)
     return remember(list) { ReorderState(list, scope) { a, b -> move(a, b) } }
+}
+
+/** A drag handle (the grip): grabbing it moves the row immediately, no long press needed. */
+fun Modifier.dragHandle(state: ReorderState, key: Any): Modifier = pointerInput(key) {
+    detectDragGestures(
+        onDragStart = { state.start(key) },
+        onDrag = { change, amount -> change.consume(); state.drag(amount.y) },
+        onDragEnd = { state.end() },
+        onDragCancel = { state.end() },
+    )
 }
 
 /** Put this on a row inside the LazyColumn; [key] must be the row's item key. */

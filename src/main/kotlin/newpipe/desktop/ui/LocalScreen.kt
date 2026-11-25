@@ -190,7 +190,8 @@ private fun FolderTree(state: LocalState, onChooseFolder: () -> Unit, modifier: 
     Column(
         modifier
             .background(Gloss.sidebar)
-            .drawBehind { drawLine(Color.Black, Offset(size.width - 1, 0f), Offset(size.width - 1, size.height)) },
+            .themed()
+            .drawBehind { drawLine(Aero.edge, Offset(size.width - 1, 0f), Offset(size.width - 1, size.height)) },
     ) {
         Row(Modifier.fillMaxWidth().padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             SectionLabel("FOLDERS", Modifier.weight(1f))
@@ -244,7 +245,7 @@ private fun FolderRow(node: LocalState.Node, state: LocalState) {
         Spacer(Modifier.width(6.dp))
         Text(
             dir.displayName(),
-            color = if (selected) Color.White else Aero.text,
+            color = if (selected) Aero.onSelection else Aero.text,
             fontSize = 12.sp,
             fontWeight = if (node.depth == 0) FontWeight.SemiBold else FontWeight.Normal,
             maxLines = 1,

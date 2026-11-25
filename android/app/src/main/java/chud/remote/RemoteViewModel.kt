@@ -40,6 +40,14 @@ class RemoteViewModel(app: Application) : AndroidViewModel(app) {
     var connectError by mutableStateOf<String?>(null); private set
     var pairing by mutableStateOf(false); private set
     var volumeKeys by mutableStateOf(prefs.getBoolean("volumeKeys", true)); private set
+
+    /** "pc" = follow the PC's theme, else a theme id. */
+    var themeChoice by mutableStateOf(prefs.getString("theme", "pc") ?: "pc"); private set
+
+    fun changeTheme(id: String) {
+        themeChoice = id
+        prefs.edit().putString("theme", id).apply()
+    }
     private var liveJob: Job? = null
 
     // ---------------- player ----------------

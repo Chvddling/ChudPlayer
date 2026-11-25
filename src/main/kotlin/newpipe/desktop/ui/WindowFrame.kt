@@ -66,17 +66,10 @@ import kotlin.math.max
  * the glossy minimize / maximize / close buttons, and invisible edges to resize.
  */
 
-private val frameBrush = Brush.verticalGradient(
-    0f to Color(0xFF3A4757), 0.04f to Color(0xFF2A3441), 0.2f to Color(0xFF1E2630), 1f to Color(0xFF151B23),
-)
 private val titleShine = Brush.verticalGradient(
     0f to Color.White.copy(alpha = 0.16f), 0.5f to Color.White.copy(alpha = 0.04f), 0.51f to Color.Transparent, 1f to Color.White.copy(alpha = 0.05f),
 )
 
-private val btnNormal = gloss(Color(0xFF5A6575), Color(0xFF353F4C), Color(0xFF1E252E), Color(0xFF39434F))
-private val btnHover = gloss(Color(0xFFA9D4F7), Color(0xFF4F8BC6), Color(0xFF2D6AAE), Color(0xFF6AA8E0))
-private val closeNormal = gloss(Color(0xFFE8907C), Color(0xFFC8452B), Color(0xFFA51F08), Color(0xFFCF4A2E))
-private val closeHover = gloss(Color(0xFFFFB9A6), Color(0xFFEC5F40), Color(0xFFC92D10), Color(0xFFF07050))
 
 /** Maximize that respects the taskbar (an undecorated window would otherwise cover it). */
 class WindowMaximizer {
@@ -109,10 +102,12 @@ fun FrameWindowScope.GlassWindowFrame(
 ) {
     val max = maximizer.maximized
     val edge = if (max) 0.dp else 5.dp
-    Box(Modifier.fillMaxSize().background(frameBrush).then(if (max) Modifier else Modifier.border(1.dp, Color.Black))) {
+    val theme = chud.theme.ThemeState.current
+    val glossy = theme.id == "smoked" || theme.id.startsWith("obsidian")
+    Box(Modifier.fillMaxSize().background(Gloss.frame).then(if (max) Modifier else Modifier.border(Aero.edgeWidth, Aero.edge))) {
         Column(Modifier.fillMaxSize().padding(start = edge, end = edge, bottom = edge)) {
             // ---------- title bar ----------
-            Row(Modifier.fillMaxWidth().height(30.dp).background(titleShine)) {
+            Row(Modifier.fillMaxWidth().height(30.dp).background(theme.titleBar).then(if (glossy) Modifier.background(titleShine) else Modifier)) {
                 val titleArea: @Composable () -> Unit = {
                     Row(
                         Modifier.fillMaxSize()
@@ -125,17 +120,17 @@ fun FrameWindowScope.GlassWindowFrame(
                         // little glowing orb, like the app icon
                         Box(
                             Modifier.size(16.dp).clip(CircleShape)
-                                .background(Brush.radialGradient(listOf(Color(0xFFD8F0FF), Color(0xFF3E9BEA), Color(0xFF0E4C90))))
+                                .background(Brush.radialGradient(theme.orb.take(3)))
                                 .border(1.dp, Color.Black, CircleShape),
                         )
                         Spacer(Modifier.width(8.dp))
                         Text(
                             title,
-                            color = Color(0xFFEAF2FA),
+                            color = Aero.textBright,
                             fontSize = 12.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            style = TextStyle(shadow = Shadow(Color.Black, blurRadius = 6f)),
+                            style = TextStyle(shadow = if (glossy) Shadow(Color.Black, blurRadius = 6f) else null),
                         )
                     }
                 }
@@ -150,7 +145,7 @@ fun FrameWindowScope.GlassWindowFrame(
                 }
             }
             // ---------- the app ----------
-            Box(Modifier.weight(1f).fillMaxWidth().border(1.dp, Color.Black)) { content() }
+            Box(Modifier.weight(1f).fillMaxWidth().border(Aero.edgeWidth, Aero.edge)) { content() }
         }
         if (!max) ResizeEdges(window)
     }
@@ -162,10 +157,12 @@ private enum class CaptionKind { Minimize, Maximize, Restore, Close }
 private fun CaptionButton(kind: CaptionKind, width: androidx.compose.ui.unit.Dp, shape: RoundedCornerShape, onClick: () -> Unit) {
     val hover = remember { MutableInteractionSource() }
     val hovered by hover.collectIsHoveredAsState()
+    val theme = chud.theme.ThemeState.current
     val brush = when {
-        kind == CaptionKind.Close -> if (hovered) closeHover else closeNormal
-        else -> if (hovered) btnHover else btnNormal
+        kind == CaptionKind.Close -> if (hovered) theme.closeHover else theme.close
+        else -> if (hovered) theme.captionHover else theme.caption
     }
+    val glossy = theme.id == "smoked" || theme.id.startsWith("obsidian")
     val label = when (kind) {
         CaptionKind.Minimize -> "Minimize"; CaptionKind.Maximize -> "Maximize"; CaptionKind.Restore -> "Restore"; CaptionKind.Close -> "Close"
     }
@@ -174,14 +171,14 @@ private fun CaptionButton(kind: CaptionKind, width: androidx.compose.ui.unit.Dp,
             .size(width, 20.dp)
             .clip(shape)
             .background(brush)
-            .border(1.dp, Color.Black, shape)
+            .border(Aero.edgeWidth.coerceAtMost(1.dp), if (theme.id == "slate") Color.Transparent else Aero.edge, shape)
             .hoverable(hover)
             .clickable(interactionSource = hover, indication = null, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
         // glossy highlight inside the button
-        Box(Modifier.fillMaxWidth().height(9.dp).align(Alignment.TopCenter).padding(horizontal = 1.dp, vertical = 1.dp).background(Color.White.copy(alpha = 0.10f)))
+        if (glossy) Box(Modifier.fillMaxWidth().height(9.dp).align(Alignment.TopCenter).padding(horizontal = 1.dp, vertical = 1.dp).background(Color.White.copy(alpha = 0.10f)))
         Canvas(Modifier.size(12.dp, 10.dp)) {
             val w = size.width
             val h = size.height
@@ -201,8 +198,8 @@ private fun CaptionButton(kind: CaptionKind, width: androidx.compose.ui.unit.Dp,
                     }
                 }
             }
-            glyph(Color(0xCC000000), 1.6f)
-            glyph(Color.White, 0f)
+            if (glossy) glyph(Color(0xCC000000), 1.6f)
+            glyph(if (glossy) Color.White else Aero.text, 0f)
         }
     }
 }

@@ -1,5 +1,8 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package chud.remote.ui
 
+import chud.theme.themePattern
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
@@ -181,13 +184,13 @@ private fun BottomTabs(vm: RemoteViewModel) {
             val sel = vm.tab == t
             Column(
                 Modifier.weight(1f).fillMaxHeight()
-                    .then(if (sel) Modifier.background(Gloss.tabSelected).border(1.dp, Color(0xFF3D7FBF)) else Modifier)
+                    .then(if (sel) Modifier.background(Gloss.tabSelected).border(1.dp, chud.theme.ThemeState.current.selectionBorder) else Modifier)
                     .clickable { vm.tab = t; vm.closeAllDetails() },
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Icon(icon, null, tint = if (sel) Color.White else Aero.dim, modifier = Modifier.size(22.dp))
-                Text(label, color = if (sel) Color.White else Aero.dim, fontSize = 11.sp, fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal)
+                Icon(icon, null, tint = if (sel) Aero.onSelection else Aero.dim, modifier = Modifier.size(22.dp))
+                Text(label, color = if (sel) Aero.onSelection else Aero.dim, fontSize = 11.sp, fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal)
             }
         }
     }
@@ -218,7 +221,7 @@ private fun PairScreen(vm: RemoteViewModel) {
             {
                 scan.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt("Scan the code in ChudPlayer's Settings").setBeepEnabled(false).setOrientationLocked(false))
             },
-            brush = Gloss.blue, textColor = Color.White, bold = true, height = 48.dp, enabled = !vm.pairing,
+            brush = Gloss.blue, textColor = Aero.onAccent, bold = true, height = 48.dp, enabled = !vm.pairing,
             modifier = Modifier.fillMaxWidth(),
         )
         Text("— or type it in —", color = Aero.label, fontSize = 12.sp)
@@ -236,6 +239,18 @@ private fun PairScreen(vm: RemoteViewModel) {
 private fun SettingsSheet(vm: RemoteViewModel, onClose: () -> Unit) {
     Sheet(onClose) {
         Text("Settings", color = Aero.bright, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(8.dp))
+        Text("Theme", color = Aero.label, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp))
+        val choices = listOf("pc" to "Same as PC") + chud.theme.Themes.all.map { it.id to it.name }
+        androidx.compose.foundation.layout.FlowRow(
+            Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            choices.forEach { (id, name) ->
+                val on = vm.themeChoice == id
+                GlossButton(name, { vm.changeTheme(id) }, brush = if (on) Gloss.blue else Gloss.button, textColor = if (on) Aero.onAccent else Aero.text, bold = on, height = 30.dp)
+            }
+        }
         val c = vm.connection
         Text("PC: ${vm.state.pc.ifEmpty { c?.name.orEmpty() }}  (${c?.host}:${c?.port})", color = Aero.dim, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp))
         if (vm.state.version.isNotEmpty()) Text("ChudPlayer v${vm.state.version}", color = Aero.dim, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 8.dp))
@@ -254,7 +269,7 @@ private fun PlayingScreen(vm: RemoteViewModel) {
         Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             Text("Nothing is playing.", color = Aero.dim, fontSize = 15.sp)
             Spacer(Modifier.height(10.dp))
-            GlossButton("Search something", { vm.tab = Tab.SEARCH }, brush = Gloss.blue, textColor = Color.White, bold = true)
+            GlossButton("Search something", { vm.tab = Tab.SEARCH }, brush = Gloss.blue, textColor = Aero.onAccent, bold = true)
         }
         return
     }
@@ -270,9 +285,16 @@ private fun PlayingScreen(vm: RemoteViewModel) {
         // LCD
         var drag by remember { mutableStateOf<Float?>(null) }
         Column(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Gloss.lcd).border(1.dp, Color.Black, RoundedCornerShape(8.dp)).padding(horizontal = 14.dp, vertical = 10.dp),
+            Modifier.fillMaxWidth().clip(themeShape(false)).background(Gloss.lcd)
+                .themePattern(chud.theme.ThemeState.current.lcdPattern, Color(0x40000000))
+                .border(Aero.edgeWidth, Aero.edge, themeShape(false)).padding(horizontal = 14.dp, vertical = 10.dp),
         ) {
-            Text(cur.title, color = Aero.lcdText, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            val th = chud.theme.ThemeState.current
+            Text(
+                if (th.upperTitles) cur.title.uppercase() else cur.title,
+                color = Aero.lcdText, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                fontFamily = themeFont(th.lcdFont),
+            )
             Text(
                 cur.uploader, color = Aero.lcdDim, fontSize = 13.sp, maxLines = 1,
                 modifier = if (!cur.uploaderUrl.isNullOrBlank()) Modifier.clickable { vm.openChannel(cur.uploaderUrl!!, cur.uploader) } else Modifier,
@@ -439,7 +461,7 @@ private fun SearchScreen(vm: RemoteViewModel) {
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxWidth().background(Aero.bg).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(
-                Modifier.fillMaxWidth().height(42.dp).clip(RoundedCornerShape(50)).background(Color(0xFF0B1118)).border(1.dp, Color.Black, RoundedCornerShape(50)).padding(horizontal = 14.dp),
+                Modifier.fillMaxWidth().height(42.dp).clip(themeShape(true)).background(chud.theme.ThemeState.current.field).border(Aero.edgeWidth, Aero.edge, themeShape(true)).padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(Icons.Filled.Search, null, tint = Aero.label, modifier = Modifier.size(18.dp))
@@ -506,14 +528,14 @@ private fun PlaylistsList(vm: RemoteViewModel) {
         Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             Text("No playlists yet.", color = Aero.dim)
             Spacer(Modifier.height(10.dp))
-            GlossButton("+ New playlist", { vm.pickPlaylistFor = emptyList() }, brush = Gloss.blue, textColor = Color.White, bold = true)
+            GlossButton("+ New playlist", { vm.pickPlaylistFor = emptyList() }, brush = Gloss.blue, textColor = Aero.onAccent, bold = true)
         }
         return
     }
     LazyColumn(Modifier.fillMaxSize()) {
         item {
             Row(Modifier.fillMaxWidth().padding(10.dp), horizontalArrangement = Arrangement.End) {
-                GlossButton("+ New playlist", { vm.pickPlaylistFor = emptyList() }, brush = Gloss.blue, textColor = Color.White, bold = true, height = 30.dp)
+                GlossButton("+ New playlist", { vm.pickPlaylistFor = emptyList() }, brush = Gloss.blue, textColor = Aero.onAccent, bold = true, height = 30.dp)
             }
         }
         itemsIndexed(vm.playlists, key = { _, p -> p.id }) { i, p ->
@@ -527,7 +549,7 @@ private fun PlaylistsList(vm: RemoteViewModel) {
                     Text(p.name, color = Aero.bright, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(listOf("${p.count} items", formatTotal(p.seconds)).filter { it.isNotEmpty() }.joinToString(" · "), color = Aero.dim, fontSize = 12.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 8.dp)) {
-                        GlossButton("Play", { vm.playPlaylist(p.id) }, brush = Gloss.blue, textColor = Color.White, bold = true, height = 28.dp, enabled = p.count > 0)
+                        GlossButton("Play", { vm.playPlaylist(p.id) }, brush = Gloss.blue, textColor = Aero.onAccent, bold = true, height = 28.dp, enabled = p.count > 0)
                         GlossButton("Shuffle", { vm.playPlaylist(p.id, shuffle = true) }, height = 28.dp, enabled = p.count > 0)
                     }
                 }
@@ -606,7 +628,7 @@ private fun DetailScreen(vm: RemoteViewModel, d: DetailPage) {
                 PillGroup(listOf("Uploads", "Playlists"), if (d.channelTab == "playlists") 1 else 0, { vm.switchChannelTab(if (it == 1) "playlists" else "videos") }, height = 28.dp)
             }
             if (items.isNotEmpty()) {
-                GlossButton("Play all", { vm.playAll(items) }, brush = Gloss.blue, textColor = Color.White, bold = true, height = 28.dp)
+                GlossButton("Play all", { vm.playAll(items) }, brush = Gloss.blue, textColor = Aero.onAccent, bold = true, height = 28.dp)
                 GlossButton("Shuffle", { vm.playAll(items, shuffle = true) }, height = 28.dp)
                 if (d.playlistId == null) GlossButton("Save", { vm.pickPlaylistFor = items }, height = 28.dp)
             }
@@ -682,7 +704,7 @@ private fun ItemRow(
         Column(Modifier.weight(1f)) {
             Text(
                 (prefix?.let { "$it  " } ?: "") + item.title,
-                color = if (selected) Color.White else Aero.bright, fontSize = 13.sp,
+                color = if (selected) Aero.onSelection else Aero.bright, fontSize = 13.sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
@@ -692,7 +714,7 @@ private fun ItemRow(
                 val len = if (item.isLive) "LIVE" else if (item.durationSec > 0) formatTime(item.durationSec.toDouble()) else ""
                 Text(
                     listOf(item.uploader, len).filter { it.isNotEmpty() }.joinToString(" · "),
-                    color = if (selected) Color(0xFFDBEAFF) else Aero.dim, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    color = if (selected) Aero.onSelection.copy(alpha = 0.8f) else Aero.dim, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -767,7 +789,7 @@ private fun PlaylistPicker(vm: RemoteViewModel, items: List<Item>) {
         Text(if (fromQueue) "Save the queue as a playlist" else "Add to playlist", color = Aero.bright, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(name, { name = it }, label = { Text("New playlist name") }, singleLine = true, modifier = Modifier.weight(1f))
-            GlossButton("Create", { vm.createPlaylist(name.ifBlank { "New playlist" }, items, fromQueue) }, brush = Gloss.blue, textColor = Color.White, bold = true)
+            GlossButton("Create", { vm.createPlaylist(name.ifBlank { "New playlist" }, items, fromQueue) }, brush = Gloss.blue, textColor = Aero.onAccent, bold = true)
         }
         if (!fromQueue) {
             Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {

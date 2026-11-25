@@ -1,5 +1,6 @@
 package newpipe.desktop.ui
 
+import chud.theme.title
 import androidx.compose.foundation.ContextMenuArea
 import androidx.compose.foundation.ContextMenuItem
 import androidx.compose.foundation.VerticalScrollbar
@@ -63,7 +64,7 @@ import newpipe.desktop.update.YtDlp
 import newpipe.desktop.update.openInBrowser
 
 /** Draws a 1px line at the bottom (or top) of a bar. */
-fun Modifier.edgeLine(bottom: Boolean = true, color: Color = Color.Black) = drawBehind {
+fun Modifier.edgeLine(bottom: Boolean = true, color: Color = Aero.edge) = drawBehind {
     val y = if (bottom) size.height - 1 else 0f
     drawLine(color, Offset(0f, y), Offset(size.width, y))
 }
@@ -77,6 +78,7 @@ fun TopBar(player: PlayerController, query: String, onQueryChange: (String) -> U
             .fillMaxWidth()
             .height(72.dp)
             .background(Gloss.bar)
+            .themed()
             .edgeLine(bottom = false, color = Color.White.copy(alpha = 0.12f))
             .edgeLine()
             .padding(horizontal = 14.dp),
@@ -118,12 +120,15 @@ fun TopBar(player: PlayerController, query: String, onQueryChange: (String) -> U
 /** The iTunes "LCD": what's playing + a seek bar, in black glass with glowing blue text. */
 @Composable
 fun LcdDisplay(player: PlayerController, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(6.dp)
-    Box(modifier.height(52.dp).clip(shape).background(Gloss.lcd).border(1.dp, Color.Black, shape)) {
-        Box(Modifier.fillMaxWidth().height(26.dp).background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.07f), Color.Transparent))))
-        val glow = TextStyle(shadow = Shadow(Color(0x995AAAFF), blurRadius = 8f))
+    val theme = chud.theme.ThemeState.current
+    val shape = if (theme.id == "smoked") RoundedCornerShape(6.dp) else themeShape(true)
+    val glossy = theme.id == "smoked" || theme.id.startsWith("obsidian")
+    Box(modifier.height(58.dp).clip(shape).background(Gloss.lcd).themed(lcd = true).border(Aero.edgeWidth, Aero.edge, shape)) {
+        if (glossy) Box(Modifier.fillMaxWidth().height(28.dp).background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.07f), Color.Transparent))))
+        val lcdFont = themeFont(theme.lcdFont)
+        val glow = TextStyle(fontFamily = lcdFont, shadow = if (Aero.glow != Color.Transparent) Shadow(Aero.glow, blurRadius = 8f) else null)
         Column(
-            Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 3.dp),
+            Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -133,7 +138,7 @@ fun LcdDisplay(player: PlayerController, modifier: Modifier = Modifier) {
                 Text("Nothing playing", color = Aero.lcdDim, fontSize = 11.sp)
             } else {
                 val title = player.details?.item?.title ?: item.title
-                Text(title, color = Aero.lcdText, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, style = glow)
+                Text(theme.title(title), color = Aero.lcdText, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, style = glow)
                 val sub = listOf(item.uploader, serviceName(item.serviceId)).filter { it.isNotBlank() }.joinToString(" — ")
                 Text(sub, color = Aero.lcdDim, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 var drag by remember { mutableStateOf<Float?>(null) }
@@ -179,6 +184,7 @@ fun ServiceBar(
             services.indexOfFirst { it.id == serviceId }.coerceAtLeast(0),
             { onService(services[it].id) },
             selectedBrush = { serviceBrush(services[it].id) },
+            selectedText = { Color.White },
         )
         if (kindLabels != null) PillGroup(kindLabels, kind, onKind)
         Text(info, color = Aero.textDim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -203,7 +209,8 @@ fun SourceList(
             .width(200.dp)
             .fillMaxHeight()
             .background(Gloss.sidebar)
-            .drawBehind { drawLine(Color.Black, Offset(size.width - 1, 0f), Offset(size.width - 1, size.height)) }
+            .themed()
+            .drawBehind { drawLine(Aero.edge, Offset(size.width - 1, 0f), Offset(size.width - 1, size.height)) }
             .padding(vertical = 6.dp),
     ) {
         SectionLabel("LIBRARY")
@@ -276,7 +283,7 @@ fun StatusBar(
     remoteOn: Boolean,
 ) {
     Row(
-        Modifier.fillMaxWidth().height(28.dp).background(Gloss.statusBar).edgeLine(bottom = false).padding(horizontal = 12.dp),
+        Modifier.fillMaxWidth().height(28.dp).background(Gloss.statusBar).themed().edgeLine(bottom = false).padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {

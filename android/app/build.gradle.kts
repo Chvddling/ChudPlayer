@@ -53,6 +53,8 @@ android {
     buildFeatures {
         compose = true
     }
+    // Themes shared with the Windows app
+    sourceSets["main"].java.srcDir("../../shared/src")
 }
 
 dependencies {

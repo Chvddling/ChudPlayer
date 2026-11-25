@@ -19,6 +19,8 @@ version = appVersion
 
 kotlin {
     jvmToolchain(21)
+    // Themes shared with the phone remote
+    sourceSets.named("main") { kotlin.srcDir("shared/src") }
 }
 
 dependencies {

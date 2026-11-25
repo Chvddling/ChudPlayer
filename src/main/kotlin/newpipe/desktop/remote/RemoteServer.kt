@@ -211,6 +211,7 @@ class RemoteServer(
             put("loading", player.loading)
             player.error?.let { put("error", it) }
             put("volume", player.volume)
+            put("theme", chud.theme.ThemeState.current.id)
             put("mode", player.mode.name)
             put("hasVideo", player.hasVideo)
             put("repeatOne", player.repeatOne)

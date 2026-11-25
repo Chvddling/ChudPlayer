@@ -1,5 +1,8 @@
 package newpipe.desktop.ui
 
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.ContextMenuItem
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
@@ -94,12 +97,10 @@ private fun Splitter(onDrag: (Float) -> Unit, onDragEnd: () -> Unit, onReset: ()
     Box(
         Modifier
             .fillMaxWidth()
-            .height(7.dp)
-            .background(
-                Brush.verticalGradient(
-                    if (hover) listOf(Color(0xFF4A6A8E), Color(0xFF22364D)) else listOf(Color(0xFF39434F), Color(0xFF1A2027))
-                )
-            )
+            .height(10.dp)
+            .background(Gloss.splitter)
+            .edgeLine(bottom = false)
+            .edgeLine()
             .pointerHoverIcon(PointerIcon(java.awt.Cursor(java.awt.Cursor.N_RESIZE_CURSOR)))
             .onPointerEvent(PointerEventType.Enter) { hover = true }
             .onPointerEvent(PointerEventType.Exit) { hover = false }
@@ -112,19 +113,42 @@ private fun Splitter(onDrag: (Float) -> Unit, onDragEnd: () -> Unit, onReset: ()
             },
         contentAlignment = Alignment.Center,
     ) {
-        // grip dots
-        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-            repeat(5) { Box(Modifier.size(3.dp).background(if (hover) Color(0xFFB8D4F0) else Color(0xFF6B7684))) }
-        }
+        // glowing handle in the theme's accent colour
+        val glow = Aero.glow
+        Box(
+            Modifier
+                .width(if (hover) 64.dp else 44.dp)
+                .height(4.dp)
+                .drawBehind {
+                    if (glow != Color.Transparent) drawRoundRect(
+                        glow.copy(alpha = if (hover) 0.9f else 0.6f),
+                        topLeft = androidx.compose.ui.geometry.Offset(-4f, -3f),
+                        size = androidx.compose.ui.geometry.Size(size.width + 8f, size.height + 6f),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f),
+                    )
+                }
+                .clip(themeShape(true))
+                .background(Gloss.progress),
+        )
     }
 }
 
 /** Cover art / thumbnail, scaled with the window (drag the splitter to trade it for queue space). */
 @Composable
 private fun MediaArea(player: PlayerController, modifier: Modifier) {
-    Box(modifier.background(Color.Black), contentAlignment = Alignment.Center) {
+    val theme = chud.theme.ThemeState.current
+    Box(
+        modifier
+            .background(Brush.radialGradient(listOf(Aero.accent.copy(alpha = 0.16f), Aero.bgDeep)))
+            .themed(),
+        contentAlignment = Alignment.Center,
+    ) {
         val art = player.details?.item?.thumbnail ?: player.current?.thumbnail
-        NetImage(art, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+        NetImage(
+            art,
+            Modifier.fillMaxSize().padding(14.dp).graphicsLayer { rotationZ = theme.artTilt },
+            contentScale = ContentScale.Fit,
+        )
         when {
             player.error != null -> {
                 Box(Modifier.fillMaxSize().background(Color(0xAA000000)))
@@ -158,7 +182,12 @@ private fun InfoStrip(player: PlayerController, actions: VideoActions) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Column(Modifier.weight(1f)) {
-            Text(item.title, color = Aero.textBright, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val theme = chud.theme.ThemeState.current
+            Text(
+                if (theme.upperTitles) item.title.uppercase() else item.title,
+                color = Aero.textBright, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                fontFamily = themeFont(theme.titleFont),
+            )
             val likes = d?.likeCount?.let { formatCount(it) }?.takeIf { it.isNotEmpty() }?.let { "$it likes" }
             val stats = listOfNotNull(
                 formatCount(item.viewCount).takeIf { it.isNotEmpty() }?.let { "$it ${playsWord(item.serviceId)}" },
@@ -194,7 +223,7 @@ private fun QueuePanel(player: PlayerController, actions: VideoActions, modifier
                     if (player.autoplay) "Autoplay ✓" else "Autoplay",
                     { player.changeAutoplay(!player.autoplay) },
                     brush = if (player.autoplay) Gloss.blue else Gloss.button,
-                    textColor = if (player.autoplay) Color.White else Aero.text,
+                    textColor = if (player.autoplay) Aero.onAccent else Aero.text,
                 )
             }
         }
@@ -209,7 +238,7 @@ private fun QueuePanel(player: PlayerController, actions: VideoActions, modifier
                             val current = i == player.index
                             TrackRow(
                                 modifier = Modifier.reorderable(reorder, q.url),
-                                grip = true,
+                                gripModifier = Modifier.dragHandle(reorder, q.url),
                                 number = if (current) "▶" else "${i + 1}",
                                 item = q,
                                 zebra = i % 2 == 1,

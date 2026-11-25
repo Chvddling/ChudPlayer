@@ -141,7 +141,7 @@ fun TrackHeader(trailingWidth: Dp = 0.dp, trailingLabel: String = "", grip: Bool
             .fillMaxWidth()
             .height(24.dp)
             .background(Gloss.header)
-            .drawBehind { drawLine(Color.Black, Offset(0f, size.height - 1), Offset(size.width, size.height - 1)) }
+            .drawBehind { drawLine(Aero.edge, Offset(0f, size.height - 1), Offset(size.width, size.height - 1)) }
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -168,12 +168,13 @@ fun TrackRow(
     selected: Boolean = false,
     extraMenu: () -> List<ContextMenuItem> = { emptyList() },
     modifier: Modifier = Modifier,
-    grip: Boolean = false,
+    /** When set, a six-dot grip is shown on the left; grabbing it drags the row right away. */
+    gripModifier: Modifier? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
     // [modifier] goes on the outermost box so drag & drop can lift the whole row
     Box(modifier.fillMaxWidth()) { VideoMenuArea(actions, item, extraMenu) {
-        val color = if (selected) Color.White else Aero.text
+        val color = if (selected) Aero.onSelection else Aero.text
         Row(
             Modifier
                 .fillMaxWidth()
@@ -183,7 +184,7 @@ fun TrackRow(
                 .padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (grip) DragGrip(if (selected) Color.White.copy(alpha = 0.8f) else Aero.textDim)
+            if (gripModifier != null) DragGrip(if (selected) Aero.onSelection.copy(alpha = 0.8f) else Aero.textDim, gripModifier)
             Text(number, Modifier.width(colNum), color = color, fontSize = 12.sp)
             Text(
                 item.title, Modifier.weight(3f).padding(end = 10.dp),
@@ -191,9 +192,9 @@ fun TrackRow(
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
             )
             Box(Modifier.weight(2f).padding(end = 10.dp)) {
-                ChannelLink(item, actions, if (selected) Color.White else Aero.textDim)
+                ChannelLink(item, actions, if (selected) Aero.onSelection else Aero.textDim)
             }
-            Text(item.lengthText(), Modifier.width(colTime), color = if (selected) Color.White else Aero.textDim, fontSize = 12.sp)
+            Text(item.lengthText(), Modifier.width(colTime), color = if (selected) Aero.onSelection else Aero.textDim, fontSize = 12.sp)
             Box(Modifier.width(colSource)) { ServiceBadge(item.serviceId) }
             trailing?.invoke(this)
         }
@@ -203,9 +204,9 @@ fun TrackRow(
 
 /** Six dots on the left of a queue row: grab here (or anywhere on the row) to drag it. */
 @Composable
-fun DragGrip(color: Color) {
+fun DragGrip(color: Color, modifier: Modifier = Modifier) {
     androidx.compose.foundation.Canvas(
-        Modifier
+        modifier
             .width(18.dp)
             .height(16.dp)
             .pointerHoverIcon(PointerIcon(java.awt.Cursor(java.awt.Cursor.MOVE_CURSOR)))
@@ -333,7 +334,7 @@ fun ChannelCard(ch: ChannelRef, actions: VideoActions) {
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 ServiceBadge(ch.serviceId)
-                GlossButton("Open", { actions.openChannel(ch.url) }, brush = Gloss.blue, textColor = Color.White, bold = true, height = 22.dp)
+                GlossButton("Open", { actions.openChannel(ch.url) }, brush = Gloss.blue, textColor = Aero.onAccent, bold = true, height = 22.dp)
             }
         }
     }
@@ -372,7 +373,7 @@ fun PlaylistCard(pl: PlaylistRef, actions: VideoActions) {
                 )
             }
             Row(Modifier.padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                GlossButton("Open", { actions.openPlaylist(pl.url) }, brush = Gloss.blue, textColor = Color.White, bold = true, height = 22.dp)
+                GlossButton("Open", { actions.openPlaylist(pl.url) }, brush = Gloss.blue, textColor = Aero.onAccent, bold = true, height = 22.dp)
             }
         }
     }

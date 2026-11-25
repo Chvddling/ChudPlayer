@@ -59,6 +59,8 @@ data class PlayerState(
     val queueRev: Int = 0,
     val queueSize: Int = 0,
     val queueSeconds: Long = 0,
+    /** The PC's theme id (chud.theme.Themes). */
+    val theme: String = "",
 )
 
 @Serializable

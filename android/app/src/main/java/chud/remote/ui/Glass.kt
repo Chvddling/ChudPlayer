@@ -1,5 +1,8 @@
 package chud.remote.ui
 
+import chud.theme.FontKind
+import chud.theme.ThemeState
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -47,38 +50,64 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 
+/** Colours of the current theme (shared with the PC app, see chud.theme.Themes). */
 object Aero {
-    val bgDeep = Color(0xFF0D1117)
-    val bg = Color(0xFF151B23)
-    val rowA = Color(0xFF10151C)
-    val rowB = Color(0xFF151B23)
-    val text = Color(0xFFD7E3EF)
-    val bright = Color(0xFFEEF4FA)
-    val dim = Color(0xFF93A8BD)
-    val label = Color(0xFF7F98B0)
-    val link = Color(0xFF8CC8FF)
-    val lcdText = Color(0xFFBFE3FF)
-    val lcdDim = Color(0xFF86A7C4)
+    private val t get() = ThemeState.current
+    val bgDeep get() = t.bgDeep
+    val bg get() = t.bgContent
+    val rowA get() = t.rowA
+    val rowB get() = t.rowB
+    val text get() = t.text
+    val bright get() = t.textBright
+    val dim get() = t.textDim
+    val label get() = t.label
+    val link get() = t.link
+    val lcdText get() = t.lcdText
+    val lcdDim get() = t.lcdDim
+    val onAccent get() = t.onAccent
+    val onSelection get() = t.onSelection
+    val edge get() = t.edge
+    val edgeWidth get() = t.edgeWidth.dp
+    val glow get() = t.glow
     val green = Color(0xFF5FD84F)
 }
 
-fun gloss(a: Color, b: Color, c: Color, d: Color) = Brush.verticalGradient(0f to a, 0.5f to b, 0.51f to c, 1f to d)
+fun gloss(a: Color, b: Color, c: Color, d: Color) = chud.theme.gloss(a, b, c, d)
 
 object Gloss {
-    val bar = gloss(Color(0xFF3B4656), Color(0xFF222A35), Color(0xFF10151C), Color(0xFF1A212B))
-    val button = gloss(Color(0xFF4A5563), Color(0xFF2B333E), Color(0xFF1B2129), Color(0xFF2C343E))
-    val blue = gloss(Color(0xFF8CCBFF), Color(0xFF3A8EE0), Color(0xFF1E6BC2), Color(0xFF4A9DEA))
+    private val t get() = ThemeState.current
+    val bar get() = t.bar
+    val button get() = t.button
+    /** The theme's accent (was always blue before themes). */
+    val blue get() = t.accentBrush
+    val rowSelected get() = t.rowSelected
+    val tabSelected get() = t.selection
+    val tabs get() = t.statusBar
+    val lcd get() = t.lcd
+    val page get() = t.content
+    val progress get() = t.progress
     val red = gloss(Color(0xFFFF8A80), Color(0xFFE0261C), Color(0xFFB50E07), Color(0xFFE2392E))
     val orange = gloss(Color(0xFFFFB06A), Color(0xFFFF7417), Color(0xFFE25200), Color(0xFFFF8A30))
     val purple = gloss(Color(0xFFC6A8FF), Color(0xFF8457E0), Color(0xFF6438C4), Color(0xFF9468EA))
     val green = gloss(Color(0xFFA6E8A0), Color(0xFF45A83C), Color(0xFF2B8424), Color(0xFF52B848))
-    val rowSelected = gloss(Color(0xFF3F8AD6), Color(0xFF1F5FAE), Color(0xFF154F99), Color(0xFF2A6FC0))
-    val tabSelected = gloss(Color(0x596EB4FF), Color(0x2E3278D2), Color(0x381E5AB4), Color(0x47468CE6))
-    val tabs = Brush.verticalGradient(listOf(Color(0xFF252D38), Color(0xFF151B22)))
-    val lcd = Brush.verticalGradient(listOf(Color(0xFF0F1A26), Color(0xFF06101A)))
-    val page = Brush.verticalGradient(listOf(Color(0xFF151B23), Color(0xFF0D1117)))
-    val progress = Brush.horizontalGradient(listOf(Color(0xFF2D8DE0), Color(0xFF9FD8FF)))
 }
+
+fun themeShape(round: Boolean = true): androidx.compose.ui.graphics.Shape {
+    val t = ThemeState.current
+    val r = if (round) t.corner else t.smallCorner
+    return if (r >= 999f) RoundedCornerShape(50) else RoundedCornerShape(r.dp)
+}
+
+fun themeFont(kind: FontKind): FontFamily = when (kind) {
+    FontKind.DEFAULT -> FontFamily.Default
+    FontKind.CONDENSED -> FontFamily(android.graphics.Typeface.create("sans-serif-condensed", android.graphics.Typeface.NORMAL))
+    FontKind.MONO -> FontFamily.Monospace
+    FontKind.TAHOMA -> FontFamily.SansSerif
+    FontKind.BLACK -> FontFamily(android.graphics.Typeface.create("sans-serif-black", android.graphics.Typeface.NORMAL))
+}
+
+private val glossyIds = setOf("smoked", "obsidian", "obsidian-emerald", "obsidian-sapphire", "obsidian-amethyst")
+val isGlossy: Boolean get() = ThemeState.current.id in glossyIds
 
 fun serviceColor(id: Int) = when (id) { 1 -> Color(0xFFE85D00); 100 -> Color(0xFF7B4FD6); 200 -> Color(0xFF2E8B3E); else -> Color(0xFFD4231A) }
 fun serviceBrush(id: Int) = when (id) { 1 -> Gloss.orange; 100 -> Gloss.purple; 200 -> Gloss.green; else -> Gloss.red }
@@ -87,16 +116,22 @@ fun serviceBrush(id: Int) = when (id) { 1 -> Gloss.orange; 100 -> Gloss.purple; 
 fun RemoteTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = darkColorScheme(
-            primary = Color(0xFF3E9BEA),
+            primary = ThemeState.current.accent,
+            onPrimary = Aero.onAccent,
             background = Aero.bgDeep,
             surface = Aero.bg,
             onSurface = Aero.text,
             onBackground = Aero.text,
-            surfaceVariant = Color(0xFF1F2731),
+            surfaceVariant = Aero.rowB,
             onSurfaceVariant = Aero.dim,
         ),
-        content = content,
-    )
+    ) {
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.material3.LocalTextStyle provides
+                androidx.compose.material3.LocalTextStyle.current.copy(fontFamily = themeFont(ThemeState.current.font)),
+            content = content,
+        )
+    }
 }
 
 fun formatTime(seconds: Double): String {
@@ -126,14 +161,14 @@ fun GlossButton(
     enabled: Boolean = true,
     height: Dp = 32.dp,
 ) {
-    val shape = RoundedCornerShape(50)
+    val shape = themeShape(true)
     Box(
         modifier
             .height(height)
             .alpha(if (enabled) 1f else 0.45f)
             .clip(shape)
             .background(brush)
-            .border(1.dp, Color.Black, shape)
+            .border(Aero.edgeWidth, Aero.edge, shape)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center,
@@ -144,49 +179,50 @@ fun GlossButton(
 
 @Composable
 fun Orb(icon: ImageVector, label: String, diameter: Dp, primary: Boolean = false, onClick: () -> Unit) {
-    val colors = if (primary) listOf(Color(0xFFD8F0FF), Color(0xFF3E9BEA), Color(0xFF0E4C90), Color(0xFF062A52))
-    else listOf(Color(0xFF7A8796), Color(0xFF2A323D), Color(0xFF11161C))
+    val theme = ThemeState.current
+    val colors = if (primary) theme.orb else theme.orbSmall
+    val shape = if (theme.corner >= 10f) CircleShape else RoundedCornerShape(theme.smallCorner.dp)
     Box(
         Modifier
             .size(diameter)
             .drawBehind {
-                if (primary) drawCircle(
-                    brush = Brush.radialGradient(listOf(Color(0x995AB4FF), Color.Transparent), center = center, radius = this.size.minDimension * 0.8f),
+                if (primary && theme.glow != Color.Transparent) drawCircle(
+                    brush = Brush.radialGradient(listOf(theme.glow, Color.Transparent), center = center, radius = this.size.minDimension * 0.8f),
                     radius = this.size.minDimension * 0.8f,
                 )
             }
-            .clip(CircleShape)
+            .clip(shape)
             .drawBehind {
-                drawCircle(brush = Brush.radialGradient(colors, center = Offset(this.size.width / 2f, this.size.height * 0.28f), radius = this.size.width * 0.85f))
-                drawOval(
+                drawRect(brush = Brush.radialGradient(colors, center = Offset(this.size.width / 2f, this.size.height * 0.28f), radius = this.size.width * 0.85f))
+                if (isGlossy) drawOval(
                     brush = Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.45f), Color.White.copy(alpha = 0.04f)), 0f, this.size.height * 0.5f),
                     topLeft = Offset(this.size.width * 0.16f, this.size.height * 0.04f),
                     size = Size(this.size.width * 0.68f, this.size.height * 0.46f),
                 )
             }
-            .border(1.dp, Color.Black, CircleShape)
+            .border(Aero.edgeWidth, Aero.edge, shape)
             .clickable(role = Role.Button, onClick = onClick)
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, null, tint = Color.White, modifier = Modifier.size(diameter * 0.42f))
+        Icon(icon, null, tint = if (primary) theme.orbIcon else Aero.text, modifier = Modifier.size(diameter * 0.42f))
     }
 }
 
 @Composable
 fun ModeToggle(icon: ImageVector, label: String, on: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(6.dp)
+    val shape = themeShape(false)
     Box(
         Modifier
             .size(52.dp, 46.dp)
             .clip(shape)
             .background(if (on) Gloss.blue else Gloss.button)
-            .border(1.dp, Color.Black, shape)
+            .border(Aero.edgeWidth, Aero.edge, shape)
             .clickable(role = Role.Switch, onClickLabel = label, onClick = onClick)
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, null, tint = if (on) Color.White else Aero.dim, modifier = Modifier.size(22.dp))
+        Icon(icon, null, tint = if (on) Aero.onAccent else Aero.dim, modifier = Modifier.size(22.dp))
     }
 }
 
@@ -211,31 +247,33 @@ fun GlossSlider(
         }
     BoxWithConstraints(modifier.height(28.dp).then(input), contentAlignment = Alignment.CenterStart) {
         val v = value.coerceIn(0f, 1f)
-        val pill = RoundedCornerShape(50)
-        Box(Modifier.fillMaxWidth().height(6.dp).clip(pill).background(Color(0xFF05080B)).border(1.dp, Color.Black, pill))
+        val theme = ThemeState.current
+        val pill = themeShape(true)
+        Box(Modifier.fillMaxWidth().height(6.dp).clip(pill).background(theme.track).border(1.dp, if (theme.edgeWidth > 1f) Aero.edge else Color.Black, pill))
         Box(Modifier.fillMaxWidth(v).height(6.dp).clip(pill).background(Gloss.progress))
         val k = 18.dp
+        val ks = if (theme.corner >= 10f) CircleShape else RoundedCornerShape(theme.smallCorner.dp)
         Box(
-            Modifier.offset(x = (maxWidth - k) * v).size(k).clip(CircleShape)
-                .background(Brush.verticalGradient(listOf(Color.White, Color(0xFF9CB3C9))))
-                .border(1.dp, Color.Black, CircleShape),
+            Modifier.offset(x = (maxWidth - k) * v).size(k).clip(ks)
+                .background(Brush.verticalGradient(theme.knob))
+                .border(1.dp, Color.Black, ks),
         )
     }
 }
 
 @Composable
-fun PillGroup(labels: List<String>, selected: Int, onSelect: (Int) -> Unit, selectedBrush: (Int) -> Brush = { Gloss.blue }, height: Dp = 30.dp) {
-    val shape = RoundedCornerShape(50)
-    Row(Modifier.height(height).clip(shape).border(1.dp, Color.Black, shape)) {
+fun PillGroup(labels: List<String>, selected: Int, onSelect: (Int) -> Unit, selectedBrush: (Int) -> Brush = { Gloss.blue }, height: Dp = 30.dp, selectedText: (Int) -> Color = { Aero.onAccent }) {
+    val shape = themeShape(true)
+    Row(Modifier.height(height).clip(shape).border(Aero.edgeWidth, Aero.edge, shape)) {
         labels.forEachIndexed { i, label ->
-            if (i > 0) Box(Modifier.width(1.dp).fillMaxHeight().background(Color.Black))
+            if (i > 0) Box(Modifier.width(Aero.edgeWidth).fillMaxHeight().background(Aero.edge))
             val sel = i == selected
             Box(
                 Modifier.fillMaxHeight().background(if (sel) selectedBrush(i) else Gloss.button)
                     .clickable(role = Role.Tab) { onSelect(i) }.padding(horizontal = 13.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(label, color = if (sel) Color.White else Aero.text, fontSize = 12.sp, fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal, maxLines = 1)
+                Text(label, color = if (sel) selectedText(i) else Aero.text, fontSize = 12.sp, fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal, maxLines = 1)
             }
         }
     }
@@ -254,9 +292,9 @@ fun ServiceTag(id: Int) {
 @Composable
 fun Thumb(url: String?, modifier: Modifier, corner: Dp = 4.dp) {
     val shape = RoundedCornerShape(corner)
-    Box(modifier.clip(shape).background(Color(0xFF232B35)).border(1.dp, Color.Black, shape)) {
+    Box(modifier.clip(shape).background(Aero.rowB).border(Aero.edgeWidth, Aero.edge, shape)) {
         if (url != null) AsyncImage(model = url, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-        Box(Modifier.fillMaxWidth().fillMaxHeight(0.5f).background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.26f), Color.White.copy(alpha = 0.03f)))))
+        if (isGlossy) Box(Modifier.fillMaxWidth().fillMaxHeight(0.5f).background(Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.26f), Color.White.copy(alpha = 0.03f)))))
     }
 }
 

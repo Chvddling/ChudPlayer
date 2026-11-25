@@ -52,7 +52,7 @@ fun HistoryScreen(history: HistoryStore, actions: VideoActions, settings: Settin
             })
             GlassSearchField(filter, { filter = it }, {}, Modifier.width(240.dp), placeholder = "Search history")
             val items = shown.map { it.item }
-            GlossButton("Play all", { actions.playAll(items) }, enabled = items.isNotEmpty(), brush = Gloss.blue, textColor = Color.White, bold = true)
+            GlossButton("Play all", { actions.playAll(items) }, enabled = items.isNotEmpty(), brush = Gloss.blue, textColor = Aero.onAccent, bold = true)
             GlossButton("Save as playlist", { actions.newPlaylist(items) }, enabled = items.isNotEmpty())
             GlossButton("Clear all", { history.clear() }, enabled = history.entries.isNotEmpty())
         }

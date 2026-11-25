@@ -1,5 +1,12 @@
 package newpipe.desktop.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -61,8 +68,32 @@ private fun Toggle(label: String, on: Boolean, onChange: (Boolean) -> Unit) {
         if (on) "$label: on" else "$label: off",
         { onChange(!on) },
         brush = if (on) Gloss.blue else Gloss.button,
-        textColor = if (on) Color.White else Aero.text,
+        textColor = if (on) Aero.onAccent else Aero.text,
     )
+}
+
+/** A small preview of a theme: its bar, accent and text colours. */
+@Composable
+private fun ThemeSwatch(t: chud.theme.ChudTheme, selected: Boolean, onClick: () -> Unit) {
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp)
+    Column(
+        Modifier
+            .width(186.dp)
+            .clip(shape)
+            .border(if (selected) 2.dp else 1.dp, if (selected) Aero.accent else Aero.edge, shape)
+            .clickable(onClick = onClick),
+    ) {
+        Box(Modifier.fillMaxWidth().height(34.dp).background(t.bar), contentAlignment = Alignment.CenterStart) {
+            Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Box(Modifier.size(18.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Brush.radialGradient(t.orb)))
+                Box(Modifier.width(60.dp).height(6.dp).clip(shape).background(t.progress))
+            }
+        }
+        Row(Modifier.fillMaxWidth().background(t.bgContent).padding(horizontal = 8.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(t.name, color = t.text, fontSize = 11.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1f), maxLines = 1)
+            if (selected) Text("✓", color = t.accent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        }
+    }
 }
 
 /** ChudPlayer settings: music folder, updates, yt-dlp backup, Squidify server. */
@@ -89,6 +120,22 @@ fun SettingsWindow(
                 Modifier.fillMaxSize().background(Aero.bgContent).verticalScroll(rememberScrollState()).padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                // ---------- Theme ----------
+                Section("Theme") {
+                    Text("How ChudPlayer looks. The phone remote follows this unless you pick its own theme there.", color = Aero.textDim, fontSize = 11.sp)
+                    val current = chud.theme.ThemeState.current
+                    chud.theme.Themes.all.chunked(3).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            row.forEach { t ->
+                                ThemeSwatch(t, t.id == current.id) {
+                                    chud.theme.ThemeState.current = t
+                                    settings.update { s -> s.copy(theme = t.id) }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // ---------- My Music ----------
                 Section("My Music") {
                     val current = local.root?.absolutePath ?: "(not set)"
@@ -224,7 +271,7 @@ fun SettingsWindow(
                     }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    GlossButton("Close", onClose, brush = Gloss.blue, textColor = Color.White, bold = true)
+                    GlossButton("Close", onClose, brush = Gloss.blue, textColor = Aero.onAccent, bold = true)
                 }
             }
         }

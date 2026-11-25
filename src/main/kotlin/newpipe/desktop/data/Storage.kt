@@ -69,6 +69,8 @@ data class Settings(
     val queuePanelHeight: Int = 260,
     /** History sort: "recent" or "plays". */
     val historySort: String = "recent",
+    /** Look of the app (chud.theme.Themes ids); the phone remote can follow it. */
+    val theme: String = "smoked",
 )
 
 class SettingsStore {

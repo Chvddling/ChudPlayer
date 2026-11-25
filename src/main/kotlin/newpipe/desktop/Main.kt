@@ -142,6 +142,7 @@ fun main() {
     NewPipeSetup.init()
 
     val settings = SettingsStore()
+    chud.theme.ThemeState.current = chud.theme.Themes.byId(settings.value.theme)
     val history = HistoryStore()
     val playlists = PlaylistStore()
     val repo = YouTubeRepo(

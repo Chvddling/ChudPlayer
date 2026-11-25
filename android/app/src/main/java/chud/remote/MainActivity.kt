@@ -16,6 +16,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
+            // Theme: the PC's one, unless a theme was picked in the remote's settings
+            val id = if (vm.themeChoice == "pc") vm.state.theme else vm.themeChoice
+            androidx.compose.runtime.LaunchedEffect(id) { chud.theme.ThemeState.current = chud.theme.Themes.byId(id) }
             RemoteTheme { RemoteApp(vm) }
         }
     }
